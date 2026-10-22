@@ -435,6 +435,66 @@
             user-select: text;
         }
 
+        /* Pestaña Códigos de error */
+        .codigos-results {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding: 16px 18px;
+            font-size: 13px;
+            line-height: 1.5;
+            user-select: text;
+        }
+        .codigos-aviso { color: var(--texto-gris); }
+        .codigo-card {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--glass-border);
+            border-radius: 14px;
+            padding: 14px 16px;
+            box-shadow: inset 0 1px 0 var(--glass-highlight);
+        }
+        .codigo-card-head {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-bottom: 10px;
+        }
+        .codigo-badge {
+            font-family: "Consolas", monospace;
+            font-size: 15px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, rgba(239,68,68,0.80) 0%, rgba(249,115,22,0.75) 100%);
+            border: 1px solid rgba(252, 165, 165, 0.45);
+        }
+        .codigo-modelo {
+            font-size: 12px;
+            color: var(--texto-gris);
+            border: 1px solid var(--glass-border);
+            border-radius: 999px;
+            padding: 1px 9px;
+        }
+        .codigo-titulo { font-weight: 600; flex: 1; min-width: 220px; }
+        .codigo-campo { margin-top: 8px; }
+        .codigo-campo-lbl {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            text-transform: uppercase;
+            color: #93C5FD;
+        }
+        .codigo-campo-txt { white-space: pre-wrap; }
+        .codigo-card mark {
+            background: rgba(250, 204, 21, 0.35);
+            color: inherit;
+            border-radius: 3px;
+            padding: 0 1px;
+        }
+
         /* Scrollbars de vidrio */
         ::-webkit-scrollbar { width: 10px; height: 10px; }
         ::-webkit-scrollbar-track { background: transparent; }
@@ -542,6 +602,7 @@
         <button id="btn-cargar-txt" class="btn"></button>
         <button id="btn-tab-partes" class="btn btn-tab-active"></button>
         <button id="btn-tab-manual" class="btn"></button>
+        <button id="btn-tab-codigos" class="btn"></button>
         <button id="btn-instalar-app" class="btn btn-green" style="margin-left:auto; min-width:160px;" hidden></button>
     </div>
 
@@ -605,6 +666,20 @@
             </div>
 
             <div id="txt-resultados-pdf" class="pdf-results"></div>
+        </div>
+
+        <!-- Pestaña 3: Códigos de error de los manuales de servicio (Supabase) -->
+        <div id="tab-codigos" class="tab-view">
+            <div class="panel filter-bar">
+                <strong id="lbl-cod-modelo" style="font-size:13px;"></strong>
+                <select id="combo-modelo-codigo" class="input-text" style="width:130px;"></select>
+                <span id="lbl-cod-buscar" style="font-size:13px;"></span>
+                <input type="text" id="entrada-codigo" class="input-text" style="width:320px;">
+                <button id="btn-buscar-codigo" class="btn btn-accent" style="min-width:140px; height:34px;"></button>
+                <span id="lbl-cod-total" style="font-size:12px; color:var(--texto-gris); margin-left:auto;"></span>
+            </div>
+
+            <div id="resultados-codigos" class="panel codigos-results"></div>
         </div>
     </div>
 
@@ -745,6 +820,24 @@ const TRADUCCIONES = {
         "entendido": "Entendido",
         "analisis_txt": "📊 Análisis de List Output",
         "manual_pdf": "📘 Manuales PDF y CSV por Modelo",
+        "codigos_error": "🚨 Códigos de error",
+        "cod_modelo": "Equipo:",
+        "cod_todos": "Todos",
+        "cod_buscar": "🔍 Código o palabra:",
+        "cod_placeholder": "Ej: C-0531, 0531, fan, M11, PFUDB...",
+        "cod_btn_buscar": "🔍 Buscar",
+        "cod_inicio": "Escribí un código de error (por ejemplo C-0531 o 0531) o una palabra (fan, M11, fusing...) y tocá Buscar.\nLos datos salen de los manuales de servicio cargados en Supabase.",
+        "cod_buscando": "Buscando en Supabase...",
+        "cod_sin_resultados": "No se encontraron códigos para «{q}».",
+        "cod_sin_conexion": "No se pudo consultar Supabase. Revisá la conexión a internet y probá de nuevo.",
+        "cod_total": "{n} resultado(s)",
+        "cod_total_parcial": "Mostrando {n} de {total}: afiná la búsqueda",
+        "cod_clasificacion": "Clasificación",
+        "cod_causa": "Causa",
+        "cod_medidas": "Qué hace el equipo al ocurrir",
+        "cod_partes": "Partes probablemente afectadas",
+        "cod_correccion": "Notas",
+        "cod_solucion": "Solución",
         "buscar": "🔍 Filtrar:",
         "placeholder_buscar": "Ej: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Ocultar partes en 0",
@@ -805,6 +898,24 @@ const TRADUCCIONES = {
         "entendido": "Got it",
         "analisis_txt": "📊 List Output Analysis",
         "manual_pdf": "📘 PDF Manuals & CSV per Model",
+        "codigos_error": "🚨 Error codes",
+        "cod_modelo": "Machine:",
+        "cod_todos": "All",
+        "cod_buscar": "🔍 Code or keyword:",
+        "cod_placeholder": "E.g.: C-0531, 0531, fan, M11, PFUDB...",
+        "cod_btn_buscar": "🔍 Search",
+        "cod_inicio": "Type an error code (e.g. C-0531 or 0531) or a keyword (fan, M11, fusing...) and press Search.\nThe data comes from the service manuals stored in Supabase.",
+        "cod_buscando": "Searching Supabase...",
+        "cod_sin_resultados": "No codes found for «{q}».",
+        "cod_sin_conexion": "Could not reach Supabase. Check your internet connection and try again.",
+        "cod_total": "{n} result(s)",
+        "cod_total_parcial": "Showing {n} of {total}: narrow the search",
+        "cod_clasificacion": "Classification",
+        "cod_causa": "Cause",
+        "cod_medidas": "What the machine does when it occurs",
+        "cod_partes": "Estimated abnormal parts",
+        "cod_correccion": "Notes",
+        "cod_solucion": "Solution",
         "buscar": "🔍 Filter:",
         "placeholder_buscar": "Ex: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Hide zero parts",
@@ -1380,6 +1491,7 @@ function actualizarTextosIdioma() {
     document.getElementById("btn-cargar-txt").textContent = t("cargar_txt");
     document.getElementById("btn-tab-partes").textContent = t("analisis_txt");
     document.getElementById("btn-tab-manual").textContent = t("manual_pdf");
+    document.getElementById("btn-tab-codigos").textContent = t("codigos_error");
     document.getElementById("btn-instalar-app").textContent = t("instalar_app");
 
     document.getElementById("lbl-buscar").textContent = t("buscar");
@@ -1395,6 +1507,14 @@ function actualizarTextosIdioma() {
     document.getElementById("lbl-error-busq").textContent = t("buscar_error_lbl");
     document.getElementById("entrada-error-pdf").placeholder = t("placeholder_error");
     document.getElementById("btn-buscar-pdf").textContent = t("btn_buscar_manual");
+
+    document.getElementById("lbl-cod-modelo").textContent = t("cod_modelo");
+    document.getElementById("lbl-cod-buscar").textContent = t("cod_buscar");
+    document.getElementById("entrada-codigo").placeholder = t("cod_placeholder");
+    document.getElementById("btn-buscar-codigo").textContent = t("cod_btn_buscar");
+    llenarComboModeloCodigo();
+    if (!ultimaBusquedaCodigos) mostrarAvisoCodigos(t("cod_inicio"));
+    else renderizarCodigos(ultimaBusquedaCodigos);
 
     const headers = document.querySelectorAll("#tabla-headers th");
     const keysHeaders = ["col_no", "col_arballon", "col_cant", "col_name", "col_partno", "col_count", "col_vida", "col_pct", "col_reset", "col_estado"];
@@ -1749,18 +1869,26 @@ async function extraerPaginasPdf(file, mod) {
 }
 
 // ================= EVENTOS DE CONTROLES =================
-document.getElementById("btn-tab-partes").addEventListener("click", () => {
-    document.getElementById("tab-partes").classList.add("active");
-    document.getElementById("tab-manual").classList.remove("active");
-    document.getElementById("btn-tab-partes").classList.add("btn-tab-active");
-    document.getElementById("btn-tab-manual").classList.remove("btn-tab-active");
+const PESTANAS = ["partes", "manual", "codigos"];
+
+function mostrarPestana(nombre) {
+    PESTANAS.forEach(p => {
+        document.getElementById(`tab-${p}`).classList.toggle("active", p === nombre);
+        document.getElementById(`btn-tab-${p}`).classList.toggle("btn-tab-active", p === nombre);
+    });
+    if (nombre === "codigos") document.getElementById("entrada-codigo").focus();
+}
+
+PESTANAS.forEach(p => {
+    document.getElementById(`btn-tab-${p}`).addEventListener("click", () => mostrarPestana(p));
 });
 
-document.getElementById("btn-tab-manual").addEventListener("click", () => {
-    document.getElementById("tab-manual").classList.add("active");
-    document.getElementById("tab-partes").classList.remove("active");
-    document.getElementById("btn-tab-manual").classList.add("btn-tab-active");
-    document.getElementById("btn-tab-partes").classList.remove("btn-tab-active");
+document.getElementById("btn-buscar-codigo").addEventListener("click", buscarCodigosError);
+document.getElementById("entrada-codigo").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") buscarCodigosError();
+});
+document.getElementById("combo-modelo-codigo").addEventListener("change", () => {
+    if (document.getElementById("entrada-codigo").value.trim()) buscarCodigosError();
 });
 
 document.getElementById("btn-cargar-txt").addEventListener("click", () => {
@@ -2017,6 +2145,143 @@ document.querySelectorAll("#tabla-headers th").forEach(th => {
 
 // Descarga la tabla Arballon completa desde Supabase y la usa como base de referencia.
 // Si no hay conexión, se sigue usando la última copia guardada en el navegador.
+// ================= CÓDIGOS DE ERROR (MANUALES DE SERVICIO EN SUPABASE) =================
+const SUPABASE_TABLA_CODIGOS = "manual_codigos_error";
+const MODELOS_MANUALES = ["C14000", "AL400"]; // equipos con manual cargado en Supabase
+const LIMITE_CODIGOS = 60;
+const CAMPOS_BUSQUEDA_CODIGOS = ["codigo", "clasificacion", "causa", "partes_sospechosas", "solucion"];
+const CAMPOS_TARJETA_CODIGO = [
+    ["causa", "cod_causa"],
+    ["medidas_alerta", "cod_medidas"],
+    ["partes_sospechosas", "cod_partes"],
+    ["solucion", "cod_solucion"],
+    ["correccion", "cod_correccion"]
+];
+
+let ultimaBusquedaCodigos = null; // { consulta, palabras, filas, total }
+let busquedaCodigosId = 0;
+
+function escaparHtml(texto) {
+    return String(texto).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function resaltarPalabras(texto, palabras) {
+    if (!palabras.length) return escaparHtml(texto);
+    const patron = new RegExp(`(${palabras.map(p => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "gi");
+    return String(texto).split(patron).map((parte, i) => i % 2 ? `<mark>${escaparHtml(parte)}</mark>` : escaparHtml(parte)).join("");
+}
+
+function llenarComboModeloCodigo() {
+    const combo = document.getElementById("combo-modelo-codigo");
+    const actual = combo.value;
+    combo.innerHTML = "";
+    [["", t("cod_todos")], ...MODELOS_MANUALES.map(m => [m, m])].forEach(([valor, texto]) => {
+        const op = document.createElement("option");
+        op.value = valor;
+        op.textContent = texto;
+        combo.appendChild(op);
+    });
+    combo.value = actual;
+}
+
+function mostrarAvisoCodigos(texto) {
+    const cont = document.getElementById("resultados-codigos");
+    cont.innerHTML = "";
+    const aviso = document.createElement("div");
+    aviso.className = "codigos-aviso";
+    aviso.style.whiteSpace = "pre-wrap";
+    aviso.textContent = texto;
+    cont.appendChild(aviso);
+}
+
+// "C-0531", "c0531", "0531" o "C 0531" se buscan como código; cualquier otra cosa como palabras
+function normalizarCodigoError(consulta) {
+    const m = consulta.toUpperCase().replace(/\s+/g, "").match(/^C?-?([0-9A-F]{4})(-\w+)?$/);
+    if (!m || !/\d/.test(m[1])) return null;
+    return `C-${m[1]}${m[2] || ""}`;
+}
+
+function filtroIlike(palabra) {
+    return `"*${palabra.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}*"`;
+}
+
+async function buscarCodigosError() {
+    const consulta = document.getElementById("entrada-codigo").value.trim();
+    const modelo = document.getElementById("combo-modelo-codigo").value;
+    document.getElementById("lbl-cod-total").textContent = "";
+    if (!consulta) {
+        ultimaBusquedaCodigos = null;
+        mostrarAvisoCodigos(t("cod_inicio"));
+        return;
+    }
+
+    const params = new URLSearchParams();
+    params.set("select", "modelo,codigo,clasificacion,causa,medidas_alerta,partes_sospechosas,correccion,solucion");
+    params.set("order", "codigo.asc,modelo.asc");
+    if (modelo) params.set("modelo", `eq.${modelo}`);
+
+    const codigo = normalizarCodigoError(consulta);
+    let palabras = [];
+    if (codigo) {
+        params.set("codigo", `ilike.${codigo}*`);
+    } else {
+        palabras = consulta.split(/\s+/).filter(Boolean).slice(0, 5);
+        const grupos = palabras.map(p => `or(${CAMPOS_BUSQUEDA_CODIGOS.map(c => `${c}.ilike.${filtroIlike(p)}`).join(",")})`);
+        params.set("and", `(${grupos.join(",")})`);
+    }
+
+    const id = ++busquedaCodigosId;
+    mostrarAvisoCodigos(t("cod_buscando"));
+    try {
+        const resp = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLA_CODIGOS}?${params}`, {
+            headers: { apikey: SUPABASE_KEY, Range: `0-${LIMITE_CODIGOS - 1}`, Prefer: "count=exact" }
+        });
+        if (id !== busquedaCodigosId) return; // llegó una búsqueda más nueva
+        if (!resp.ok && resp.status !== 416) throw new Error(`HTTP ${resp.status}`);
+        const filas = resp.status === 416 ? [] : await resp.json();
+        const rango = resp.headers.get("content-range") || "";
+        const total = parseInt(rango.split("/")[1], 10) || filas.length;
+        ultimaBusquedaCodigos = { consulta, palabras, filas, total };
+        renderizarCodigos(ultimaBusquedaCodigos);
+    } catch (err) {
+        if (id !== busquedaCodigosId) return;
+        console.warn("No se pudieron buscar códigos de error en Supabase:", err);
+        ultimaBusquedaCodigos = null;
+        mostrarAvisoCodigos(t("cod_sin_conexion"));
+    }
+}
+
+function renderizarCodigos({ consulta, palabras, filas, total }) {
+    const lblTotal = document.getElementById("lbl-cod-total");
+    if (!filas.length) {
+        lblTotal.textContent = "";
+        mostrarAvisoCodigos(t("cod_sin_resultados").replace("{q}", consulta));
+        return;
+    }
+    lblTotal.textContent = total > filas.length
+        ? t("cod_total_parcial").replace("{n}", filas.length).replace("{total}", total)
+        : t("cod_total").replace("{n}", total);
+
+    document.getElementById("resultados-codigos").innerHTML = filas.map(f => {
+        const campos = CAMPOS_TARJETA_CODIGO.map(([col, clave]) => {
+            let valor = (f[col] || "").trim();
+            if (col === "correccion") valor = valor.replace(/^Note\s*\n/i, "").trim();
+            if (!valor) return "";
+            return `<div class="codigo-campo">
+                <div class="codigo-campo-lbl">${escaparHtml(t(clave))}</div>
+                <div class="codigo-campo-txt">${resaltarPalabras(valor, palabras)}</div>
+            </div>`;
+        }).join("");
+        return `<div class="codigo-card">
+            <div class="codigo-card-head">
+                <span class="codigo-badge">${resaltarPalabras(f.codigo, palabras)}</span>
+                <span class="codigo-modelo">${escaparHtml(f.modelo)}</span>
+                <span class="codigo-titulo">${resaltarPalabras(f.clasificacion || "", palabras)}</span>
+            </div>${campos}
+        </div>`;
+    }).join("");
+}
+
 async function cargarArballonSupabase() {
     mostrarProgreso(t("modal_supabase"), 0.05);
     try {
