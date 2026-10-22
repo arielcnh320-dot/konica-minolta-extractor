@@ -664,6 +664,7 @@
         <button id="btn-tab-codigos" class="btn"></button>
         <button id="btn-tab-mant" class="btn"></button>
         <button id="btn-tab-docs" class="btn"></button>
+        <button id="btn-tab-rep" class="btn"></button>
     </div>
 
     <div class="view-container">
@@ -776,6 +777,26 @@
             </div>
 
             <div id="resultados-docs" class="panel codigos-results"></div>
+        </div>
+
+        <!-- Pestaña 6: Catálogo de repuestos por equipo (Supabase) -->
+        <div id="tab-rep" class="tab-view">
+            <div class="panel filter-bar">
+                <strong id="lbl-rep-modelo" style="font-size:13px;"></strong>
+                <select id="combo-modelo-rep" class="input-text" style="width:130px;"></select>
+                <span id="lbl-rep-clase" style="font-size:13px;"></span>
+                <select id="combo-clase-rep" class="input-text" style="width:110px;"></select>
+                <input type="text" id="entrada-rep" class="input-text" style="width:320px;">
+                <span id="lbl-rep-total" style="font-size:12px; color:var(--texto-gris); margin-left:auto;"></span>
+            </div>
+
+            <div class="panel table-wrapper">
+                <table id="tabla-rep" class="tabla-mant">
+                    <thead><tr id="tabla-rep-headers"></tr></thead>
+                    <tbody id="tabla-rep-body"></tbody>
+                </table>
+                <div id="aviso-rep" class="codigos-aviso" style="padding:14px 10px; white-space:pre-wrap;"></div>
+            </div>
         </div>
     </div>
 
@@ -971,6 +992,26 @@ const TRADUCCIONES = {
         "docs_ver": "📄 Ver página completa",
         "docs_ocultar": "▲ Ocultar",
         "docs_cargando_pagina": "Cargando página...",
+        "rep_tab": "🔩 Repuestos",
+        "rep_modelo": "Equipo:",
+        "rep_clase": "Clase:",
+        "rep_placeholder": "Buscar: Parts No., nombre, página, PMN...",
+        "rep_cargando": "Cargando el catálogo de repuestos desde Supabase...",
+        "rep_sin_conexion": "No se pudo cargar el catálogo de repuestos desde Supabase. Revisá la conexión a internet y volvé a abrir la pestaña.",
+        "rep_sin_filas": "No hay repuestos con estos filtros.",
+        "rep_total": "{n} repuesto(s)",
+        "rep_total_parcial": "Mostrando {n} de {total}: afiná la búsqueda",
+        "rep_col_pagina": "Página",
+        "rep_col_key": "N.º",
+        "rep_col_parts": "Parts No.",
+        "rep_col_nombre": "Parts Name",
+        "rep_col_clase": "Clase",
+        "rep_col_cant": "Cant.",
+        "rep_col_envio": "Unid. envío",
+        "rep_col_destinos": "Destinos",
+        "rep_col_pmn": "PMN No.",
+        "rep_en_catalogo": "Catálogo: {nombre} · pág. {pagina} n.º {key}",
+        "rep_mas": "+{n} más",
         "buscar": "🔍 Filtrar:",
         "placeholder_buscar": "Ej: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Ocultar partes en 0",
@@ -1086,6 +1127,26 @@ const TRADUCCIONES = {
         "docs_ver": "📄 Show full page",
         "docs_ocultar": "▲ Hide",
         "docs_cargando_pagina": "Loading page...",
+        "rep_tab": "🔩 Parts",
+        "rep_modelo": "Machine:",
+        "rep_clase": "Class:",
+        "rep_placeholder": "Search: Parts No., name, page, PMN...",
+        "rep_cargando": "Loading the parts catalog from Supabase...",
+        "rep_sin_conexion": "Could not load the parts catalog from Supabase. Check your internet connection and open the tab again.",
+        "rep_sin_filas": "No parts match these filters.",
+        "rep_total": "{n} part(s)",
+        "rep_total_parcial": "Showing {n} of {total}: narrow the search",
+        "rep_col_pagina": "Page",
+        "rep_col_key": "Key",
+        "rep_col_parts": "Parts No.",
+        "rep_col_nombre": "Parts Name",
+        "rep_col_clase": "Class",
+        "rep_col_cant": "Qty",
+        "rep_col_envio": "Ship unit",
+        "rep_col_destinos": "Destinations",
+        "rep_col_pmn": "PMN No.",
+        "rep_en_catalogo": "Catalog: {nombre} · p. {pagina} key {key}",
+        "rep_mas": "+{n} more",
         "buscar": "🔍 Filter:",
         "placeholder_buscar": "Ex: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Hide zero parts",
@@ -1703,6 +1764,13 @@ function actualizarTextosIdioma() {
     if (!ultimaBusquedaDocs) mostrarAviso("resultados-docs", t("docs_inicio"));
     else renderizarDocs(ultimaBusquedaDocs);
 
+    document.getElementById("btn-tab-rep").textContent = t("rep_tab");
+    document.getElementById("lbl-rep-modelo").textContent = t("rep_modelo");
+    document.getElementById("lbl-rep-clase").textContent = t("rep_clase");
+    document.getElementById("entrada-rep").placeholder = t("rep_placeholder");
+    llenarFiltrosRepuestos();
+    renderizarRepuestos();
+
     const headers = document.querySelectorAll("#tabla-headers th");
     const keysHeaders = ["col_no", "col_arballon", "col_cant", "col_name", "col_partno", "col_count", "col_vida", "col_pct", "col_reset", "col_estado"];
     headers.forEach((th, i) => { th.textContent = t(keysHeaders[i]); });
@@ -2056,7 +2124,7 @@ async function extraerPaginasPdf(file, mod) {
 }
 
 // ================= EVENTOS DE CONTROLES =================
-const PESTANAS = ["partes", "manual", "codigos", "mant", "docs"];
+const PESTANAS = ["partes", "manual", "codigos", "mant", "docs", "rep"];
 
 function mostrarPestana(nombre) {
     PESTANAS.forEach(p => {
@@ -2064,8 +2132,16 @@ function mostrarPestana(nombre) {
         document.getElementById(`btn-tab-${p}`).classList.toggle("btn-tab-active", p === nombre);
     });
     if (nombre === "codigos") document.getElementById("entrada-codigo").focus();
-    if (nombre === "mant") cargarMantenimiento(document.getElementById("combo-modelo-mant").value);
+    if (nombre === "mant") {
+        const modelo = document.getElementById("combo-modelo-mant").value;
+        cargarMantenimiento(modelo);
+        cargarRepuestos(modelo); // para mostrar el nombre del repuesto junto a cada Parts No.
+    }
     if (nombre === "docs") document.getElementById("entrada-docs").focus();
+    if (nombre === "rep") {
+        cargarRepuestos(document.getElementById("combo-modelo-rep").value);
+        document.getElementById("entrada-rep").focus();
+    }
 }
 
 PESTANAS.forEach(p => {
@@ -2083,6 +2159,7 @@ document.getElementById("combo-modelo-codigo").addEventListener("change", () => 
 document.getElementById("combo-modelo-mant").addEventListener("change", (e) => {
     document.getElementById("combo-unidad-mant").value = "";
     cargarMantenimiento(e.target.value);
+    cargarRepuestos(e.target.value);
     llenarFiltrosMantenimiento();
     renderizarMantenimiento();
 });
@@ -2090,6 +2167,15 @@ document.getElementById("combo-modelo-mant").addEventListener("change", (e) => {
     document.getElementById(id).addEventListener("change", renderizarMantenimiento);
 });
 document.getElementById("entrada-mant").addEventListener("input", renderizarMantenimiento);
+
+document.getElementById("combo-modelo-rep").addEventListener("change", (e) => {
+    document.getElementById("combo-clase-rep").value = "";
+    cargarRepuestos(e.target.value);
+    llenarFiltrosRepuestos();
+    renderizarRepuestos();
+});
+document.getElementById("combo-clase-rep").addEventListener("change", renderizarRepuestos);
+document.getElementById("entrada-rep").addEventListener("input", renderizarRepuestos);
 
 document.getElementById("btn-buscar-docs").addEventListener("click", buscarEnManuales);
 document.getElementById("entrada-docs").addEventListener("keydown", (e) => {
@@ -2572,7 +2658,8 @@ function renderizarMantenimiento() {
     const aviso = document.getElementById("aviso-mant");
     const lblTotal = document.getElementById("lbl-mant-total");
 
-    const filas = mantPorModelo[document.getElementById("combo-modelo-mant").value];
+    const modelo = document.getElementById("combo-modelo-mant").value;
+    const filas = mantPorModelo[modelo];
     if (!Array.isArray(filas)) {
         cuerpo.innerHTML = "";
         lblTotal.textContent = "";
@@ -2601,13 +2688,144 @@ function renderizarMantenimiento() {
             <td class="ajustar">${escaparHtml(f.unidad || "")}</td>
             <td class="ajustar">${escaparHtml(f.seccion || "")}</td>
             <td class="ajustar" style="font-weight:600;">${resaltarPalabras(f.descripcion || "", palabras)}</td>
-            <td>${resaltarPalabras(f.parts_no || "", palabras)}</td>
+            <td>${resaltarPalabras(f.parts_no || "", palabras)}${referenciaCatalogo(modelo, f.parts_no || partesEnTexto(f.descripcion))}</td>
             <td class="num">${f.cantidad ?? ""}</td>
             <td class="num" style="white-space:nowrap;">${escaparHtml(formatearIntervalo(f))}${puntual}</td>
             <td>${acciones}</td>
             <td class="obs">${escaparHtml(f.observacion || "")}</td>
         </tr>`;
     }).join("");
+}
+
+// ================= CATÁLOGO DE REPUESTOS POR EQUIPO (SUPABASE) =================
+const CATALOGOS_REPUESTOS = { "AL400": "al400" }; // equipo -> tabla de Supabase con su catálogo
+const LIMITE_FILAS_REPUESTOS = 500;
+const COLUMNAS_REP = [
+    ["Page", "rep_col_pagina", "num"], ["Key", "rep_col_key", "num"], ["Parts No.", "rep_col_parts", ""],
+    ["Parts Name", "rep_col_nombre", "ajustar"], ["Class", "rep_col_clase", ""], ["Quantity", "rep_col_cant", "num"],
+    ["Ship Unit", "rep_col_envio", "num"], ["Destinations", "rep_col_destinos", "ajustar"], ["PMN No.", "rep_col_pmn", ""]
+];
+const repuestosPorModelo = {}; // modelo -> filas | "cargando" | "error"
+const referenciasCatalogo = {}; // "modelo|parts_no" -> filas del catálogo que coinciden
+
+async function cargarRepuestos(modelo) {
+    const tabla = CATALOGOS_REPUESTOS[modelo];
+    if (!tabla || Array.isArray(repuestosPorModelo[modelo]) || repuestosPorModelo[modelo] === "cargando") return;
+    repuestosPorModelo[modelo] = "cargando";
+    renderizarRepuestos();
+    try {
+        const filas = [];
+        for (let desde = 0; ; desde += SUPABASE_PAGINA) {
+            const resp = await fetch(`${SUPABASE_URL}/rest/v1/${tabla}?select=*`, {
+                headers: { apikey: SUPABASE_KEY, Range: `${desde}-${desde + SUPABASE_PAGINA - 1}` }
+            });
+            if (!resp.ok && resp.status !== 416) throw new Error(`HTTP ${resp.status}`);
+            const pagina = resp.status === 416 ? [] : await resp.json();
+            filas.push(...pagina);
+            if (pagina.length < SUPABASE_PAGINA) break;
+        }
+        const numero = v => { const n = parseFloat(v); return isNaN(n) ? Infinity : n; };
+        filas.sort((a, b) => numero(a.Page) - numero(b.Page) || numero(a.Key) - numero(b.Key));
+        repuestosPorModelo[modelo] = filas;
+    } catch (err) {
+        console.warn("No se pudo cargar el catálogo de repuestos desde Supabase:", err);
+        repuestosPorModelo[modelo] = "error";
+    }
+    if (document.getElementById("combo-modelo-rep").value === modelo) {
+        llenarFiltrosRepuestos();
+        renderizarRepuestos();
+    }
+    if (document.getElementById("combo-modelo-mant").value === modelo) renderizarMantenimiento();
+}
+
+function llenarFiltrosRepuestos() {
+    const comboModelo = document.getElementById("combo-modelo-rep");
+    const actual = comboModelo.value;
+    comboModelo.innerHTML = "";
+    Object.keys(CATALOGOS_REPUESTOS).forEach(m => {
+        const op = document.createElement("option");
+        op.value = m;
+        op.textContent = m;
+        comboModelo.appendChild(op);
+    });
+    if (actual in CATALOGOS_REPUESTOS) comboModelo.value = actual;
+
+    const filas = repuestosPorModelo[comboModelo.value];
+    const clases = Array.isArray(filas) ? [...new Set(filas.map(f => f.Class).filter(Boolean))].sort() : [];
+    const comboClase = document.getElementById("combo-clase-rep");
+    const claseActual = comboClase.value;
+    comboClase.innerHTML = "";
+    [["", t("mant_todas")], ...clases.map(c => [c, c])].forEach(([valor, texto]) => {
+        const op = document.createElement("option");
+        op.value = valor;
+        op.textContent = texto;
+        comboClase.appendChild(op);
+    });
+    comboClase.value = clases.includes(claseActual) ? claseActual : "";
+}
+
+function renderizarRepuestos() {
+    document.getElementById("tabla-rep-headers").innerHTML =
+        COLUMNAS_REP.map(([, clave]) => `<th class="align-l">${escaparHtml(t(clave))}</th>`).join("");
+    const cuerpo = document.getElementById("tabla-rep-body");
+    const aviso = document.getElementById("aviso-rep");
+    const lblTotal = document.getElementById("lbl-rep-total");
+
+    const filas = repuestosPorModelo[document.getElementById("combo-modelo-rep").value];
+    if (!Array.isArray(filas)) {
+        cuerpo.innerHTML = "";
+        lblTotal.textContent = "";
+        aviso.textContent = filas === "error" ? t("rep_sin_conexion") : t("rep_cargando");
+        return;
+    }
+
+    const clase = document.getElementById("combo-clase-rep").value;
+    const palabras = document.getElementById("entrada-rep").value.toLowerCase().split(/\s+/).filter(Boolean);
+    const visibles = filas.filter(f => {
+        if (clase && f.Class !== clase) return false;
+        const texto = [f["Parts No."], f["Parts Name"], f["PMN No."], f.Destinations, `p${f.Page}`].join(" ").toLowerCase();
+        return palabras.every(p => texto.includes(p));
+    });
+
+    lblTotal.textContent = visibles.length > LIMITE_FILAS_REPUESTOS
+        ? t("rep_total_parcial").replace("{n}", LIMITE_FILAS_REPUESTOS).replace("{total}", visibles.length)
+        : t("rep_total").replace("{n}", visibles.length);
+    aviso.textContent = visibles.length ? "" : t("rep_sin_filas");
+    cuerpo.innerHTML = visibles.slice(0, LIMITE_FILAS_REPUESTOS).map((f, i) =>
+        `<tr class="${i % 2 ? "impar" : "par"}">${COLUMNAS_REP.map(([col, , css]) =>
+            `<td class="${css}">${resaltarPalabras(f[col] ?? "", palabras)}</td>`).join("")}</tr>`
+    ).join("");
+}
+
+// Busca en el catálogo del equipo los repuestos de un Parts No. del manual ("AC0CR744##/AC0CR783##" -> AC0CR744xx)
+function buscarEnCatalogo(modelo, partsNo) {
+    const catalogo = repuestosPorModelo[modelo];
+    if (!Array.isArray(catalogo) || !partsNo) return [];
+    const clave = `${modelo}|${partsNo}`;
+    if (!(clave in referenciasCatalogo)) {
+        const prefijos = partsNo.toUpperCase().split(/[\/,;\s]+/)
+            .map(tok => tok.replace(/[#\-]/g, "")).filter(tok => tok.length >= 6);
+        referenciasCatalogo[clave] = catalogo.filter(f => {
+            const parte = String(f["Parts No."] || "").toUpperCase().replace(/\s+/g, "");
+            return prefijos.some(p => parte.startsWith(p));
+        });
+    }
+    return referenciasCatalogo[clave];
+}
+
+// Algunos manuales ponen el Parts No. dentro de la descripción ("Waste toner box AC0CR744##/AC0CR783##")
+function partesEnTexto(texto) {
+    return (String(texto || "").match(/\b(?=[A-Z0-9]*\d)(?=[A-Z0-9]*[A-Z])[A-Z0-9]{6,}#*/g) || []).join("/");
+}
+
+function referenciaCatalogo(modelo, partsNo) {
+    const coincidencias = buscarEnCatalogo(modelo, partsNo);
+    if (!coincidencias.length) return "";
+    const f = coincidencias[0];
+    let texto = t("rep_en_catalogo").replace("{nombre}", f["Parts Name"] || f["Parts No."])
+        .replace("{pagina}", f.Page ?? "?").replace("{key}", f.Key ?? "?");
+    if (coincidencias.length > 1) texto += ` (${t("rep_mas").replace("{n}", coincidencias.length - 1)})`;
+    return `<div style="font-size:11px; color:var(--texto-gris); white-space:normal; min-width:160px;">${escaparHtml(texto)}</div>`;
 }
 
 // ================= BÚSQUEDA EN EL TEXTO COMPLETO DE LOS MANUALES (SUPABASE) =================
