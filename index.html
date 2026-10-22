@@ -128,6 +128,20 @@
             flex-wrap: wrap;
         }
 
+        .tab-bar {
+            display: flex;
+            padding: 8px 12px;
+            gap: 8px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+        .tab-bar .btn {
+            flex: 1 1 auto;
+            min-width: 0;
+            height: 38px;
+            white-space: nowrap;
+        }
+
         /* ===== Botones de vidrio ===== */
         .btn, .select-menu {
             position: relative;
@@ -488,11 +502,51 @@
             color: #93C5FD;
         }
         .codigo-campo-txt { white-space: pre-wrap; }
-        .codigo-card mark {
+        .codigo-card mark,
+        .tabla-mant mark {
             background: rgba(250, 204, 21, 0.35);
             color: inherit;
             border-radius: 3px;
             padding: 0 1px;
+        }
+
+        /* Pestaña Mantenimiento */
+        .tabla-mant { font-size: 13px; font-weight: normal; }
+        .tabla-mant thead th { cursor: default; }
+        .tabla-mant tbody tr { height: auto; }
+        .tabla-mant td { padding: 8px 10px; vertical-align: top; }
+        .tabla-mant td.ajustar { white-space: pre-wrap; min-width: 180px; }
+        .tabla-mant td.obs { white-space: pre-wrap; min-width: 260px; color: var(--texto-gris); font-size: 12px; }
+        .tabla-mant td.num { text-align: right; }
+        .accion-chip {
+            display: inline-block;
+            padding: 1px 9px;
+            border-radius: 999px;
+            font-size: 12px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.07);
+        }
+        .accion-chip.reemplazo { background: rgba(239, 68, 68, 0.25); border-color: rgba(252, 165, 165, 0.45); }
+        .accion-chip.limpieza { background: rgba(59, 130, 246, 0.25); border-color: rgba(147, 197, 253, 0.45); }
+        .accion-chip.lubricacion { background: rgba(245, 158, 11, 0.25); border-color: rgba(252, 211, 77, 0.45); }
+        .accion-chip.revision { background: rgba(16, 185, 129, 0.25); border-color: rgba(110, 231, 183, 0.45); }
+
+        /* Pestaña Buscar en manuales */
+        .doc-ruta { font-size: 12px; color: var(--texto-gris); margin-bottom: 6px; }
+        .doc-texto {
+            white-space: pre-wrap;
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid var(--glass-border);
+            max-height: 420px;
+            overflow-y: auto;
+        }
+        .btn-mini {
+            height: 28px;
+            min-width: 0;
+            padding: 0 12px;
+            font-size: 12px;
+            margin-top: 10px;
         }
 
         /* Scrollbars de vidrio */
@@ -600,10 +654,16 @@
     <div class="panel top-bar">
         <select id="menu-opciones" class="select-menu"></select>
         <button id="btn-cargar-txt" class="btn"></button>
+        <button id="btn-instalar-app" class="btn btn-green" style="margin-left:auto; min-width:160px;" hidden></button>
+    </div>
+
+    <!-- Pestañas -->
+    <div class="panel tab-bar">
         <button id="btn-tab-partes" class="btn btn-tab-active"></button>
         <button id="btn-tab-manual" class="btn"></button>
         <button id="btn-tab-codigos" class="btn"></button>
-        <button id="btn-instalar-app" class="btn btn-green" style="margin-left:auto; min-width:160px;" hidden></button>
+        <button id="btn-tab-mant" class="btn"></button>
+        <button id="btn-tab-docs" class="btn"></button>
     </div>
 
     <div class="view-container">
@@ -680,6 +740,42 @@
             </div>
 
             <div id="resultados-codigos" class="panel codigos-results"></div>
+        </div>
+
+        <!-- Pestaña 4: Mantenimiento periódico de los manuales de servicio (Supabase) -->
+        <div id="tab-mant" class="tab-view">
+            <div class="panel filter-bar">
+                <strong id="lbl-mant-modelo" style="font-size:13px;"></strong>
+                <select id="combo-modelo-mant" class="input-text" style="width:130px;"></select>
+                <span id="lbl-mant-unidad" style="font-size:13px;"></span>
+                <select id="combo-unidad-mant" class="input-text" style="width:260px;"></select>
+                <span id="lbl-mant-accion" style="font-size:13px;"></span>
+                <select id="combo-accion-mant" class="input-text" style="width:150px;"></select>
+                <input type="text" id="entrada-mant" class="input-text" style="width:240px;">
+                <span id="lbl-mant-total" style="font-size:12px; color:var(--texto-gris); margin-left:auto;"></span>
+            </div>
+
+            <div class="panel table-wrapper">
+                <table id="tabla-mant" class="tabla-mant">
+                    <thead><tr id="tabla-mant-headers"></tr></thead>
+                    <tbody id="tabla-mant-body"></tbody>
+                </table>
+                <div id="aviso-mant" class="codigos-aviso" style="padding:14px 10px; white-space:pre-wrap;"></div>
+            </div>
+        </div>
+
+        <!-- Pestaña 5: Búsqueda en el texto completo de los manuales (Supabase) -->
+        <div id="tab-docs" class="tab-view">
+            <div class="panel filter-bar">
+                <strong id="lbl-docs-modelo" style="font-size:13px;"></strong>
+                <select id="combo-modelo-docs" class="input-text" style="width:130px;"></select>
+                <span id="lbl-docs-buscar" style="font-size:13px;"></span>
+                <input type="text" id="entrada-docs" class="input-text" style="width:380px;">
+                <button id="btn-buscar-docs" class="btn btn-accent" style="min-width:140px; height:34px;"></button>
+                <span id="lbl-docs-total" style="font-size:12px; color:var(--texto-gris); margin-left:auto;"></span>
+            </div>
+
+            <div id="resultados-docs" class="panel codigos-results"></div>
         </div>
     </div>
 
@@ -838,6 +934,43 @@ const TRADUCCIONES = {
         "cod_partes": "Partes probablemente afectadas",
         "cod_correccion": "Notas",
         "cod_solucion": "Solución",
+        "mant_tab": "🛠️ Mantenimiento",
+        "mant_modelo": "Equipo:",
+        "mant_unidad": "Unidad:",
+        "mant_accion": "Acción:",
+        "mant_todas": "Todas",
+        "mant_placeholder": "Filtrar: pieza, Parts No., sección...",
+        "mant_cargando": "Cargando el mantenimiento desde Supabase...",
+        "mant_sin_filas": "No hay ítems de mantenimiento con estos filtros.",
+        "mant_sin_conexion": "No se pudo cargar el mantenimiento desde Supabase. Revisá la conexión a internet y volvé a abrir la pestaña.",
+        "mant_total": "{n} ítem(s)",
+        "mant_col_unidad": "Unidad",
+        "mant_col_seccion": "Sección",
+        "mant_col_desc": "Descripción",
+        "mant_col_parts": "Parts No.",
+        "mant_col_cant": "Cant.",
+        "mant_col_intervalo": "Intervalo",
+        "mant_col_accion": "Acción",
+        "mant_col_obs": "Observaciones",
+        "mant_counts": "copias",
+        "mant_puntual": "reemplazo puntual",
+        "acc_Reemplazo": "Reemplazo",
+        "acc_Limpieza": "Limpieza",
+        "acc_Lubricación": "Lubricación",
+        "acc_Revisión": "Revisión",
+        "docs_tab": "📖 Buscar en manuales",
+        "docs_modelo": "Equipo:",
+        "docs_buscar": "🔍 Buscar (en inglés):",
+        "docs_placeholder": "Ej: fusing belt replacement, \"drum unit\", J-7372...",
+        "docs_btn": "🔍 Buscar",
+        "docs_inicio": "Buscá cualquier tema en el texto completo de los manuales de servicio. Los manuales están en inglés, así que escribí en inglés.\nEj: fusing belt replacement · \"drum unit\" · developing -toner\nUsá comillas para una frase exacta y un guion delante para excluir una palabra.",
+        "docs_buscando": "Buscando en los manuales...",
+        "docs_sin_resultados": "No se encontraron páginas para «{q}».",
+        "docs_total": "{n} página(s)",
+        "docs_total_parcial": "Las {n} más relevantes de {total}",
+        "docs_ver": "📄 Ver página completa",
+        "docs_ocultar": "▲ Ocultar",
+        "docs_cargando_pagina": "Cargando página...",
         "buscar": "🔍 Filtrar:",
         "placeholder_buscar": "Ej: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Ocultar partes en 0",
@@ -916,6 +1049,43 @@ const TRADUCCIONES = {
         "cod_partes": "Estimated abnormal parts",
         "cod_correccion": "Notes",
         "cod_solucion": "Solution",
+        "mant_tab": "🛠️ Maintenance",
+        "mant_modelo": "Machine:",
+        "mant_unidad": "Unit:",
+        "mant_accion": "Action:",
+        "mant_todas": "All",
+        "mant_placeholder": "Filter: part, Parts No., section...",
+        "mant_cargando": "Loading maintenance from Supabase...",
+        "mant_sin_filas": "No maintenance items match these filters.",
+        "mant_sin_conexion": "Could not load maintenance from Supabase. Check your internet connection and open the tab again.",
+        "mant_total": "{n} item(s)",
+        "mant_col_unidad": "Unit",
+        "mant_col_seccion": "Section",
+        "mant_col_desc": "Description",
+        "mant_col_parts": "Parts No.",
+        "mant_col_cant": "Qty",
+        "mant_col_intervalo": "Interval",
+        "mant_col_accion": "Action",
+        "mant_col_obs": "Remarks",
+        "mant_counts": "counts",
+        "mant_puntual": "replace as needed",
+        "acc_Reemplazo": "Replace",
+        "acc_Limpieza": "Clean",
+        "acc_Lubricación": "Lubricate",
+        "acc_Revisión": "Check",
+        "docs_tab": "📖 Search manuals",
+        "docs_modelo": "Machine:",
+        "docs_buscar": "🔍 Search:",
+        "docs_placeholder": "E.g.: fusing belt replacement, \"drum unit\", J-7372...",
+        "docs_btn": "🔍 Search",
+        "docs_inicio": "Search any topic in the full text of the service manuals.\nE.g.: fusing belt replacement · \"drum unit\" · developing -toner\nUse quotes for an exact phrase and a leading dash to exclude a word.",
+        "docs_buscando": "Searching the manuals...",
+        "docs_sin_resultados": "No pages found for «{q}».",
+        "docs_total": "{n} page(s)",
+        "docs_total_parcial": "Top {n} of {total}",
+        "docs_ver": "📄 Show full page",
+        "docs_ocultar": "▲ Hide",
+        "docs_cargando_pagina": "Loading page...",
         "buscar": "🔍 Filter:",
         "placeholder_buscar": "Ex: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Hide zero parts",
@@ -1516,6 +1686,23 @@ function actualizarTextosIdioma() {
     if (!ultimaBusquedaCodigos) mostrarAvisoCodigos(t("cod_inicio"));
     else renderizarCodigos(ultimaBusquedaCodigos);
 
+    document.getElementById("btn-tab-mant").textContent = t("mant_tab");
+    document.getElementById("lbl-mant-modelo").textContent = t("mant_modelo");
+    document.getElementById("lbl-mant-unidad").textContent = t("mant_unidad");
+    document.getElementById("lbl-mant-accion").textContent = t("mant_accion");
+    document.getElementById("entrada-mant").placeholder = t("mant_placeholder");
+    llenarFiltrosMantenimiento();
+    renderizarMantenimiento();
+
+    document.getElementById("btn-tab-docs").textContent = t("docs_tab");
+    document.getElementById("lbl-docs-modelo").textContent = t("docs_modelo");
+    document.getElementById("lbl-docs-buscar").textContent = t("docs_buscar");
+    document.getElementById("entrada-docs").placeholder = t("docs_placeholder");
+    document.getElementById("btn-buscar-docs").textContent = t("docs_btn");
+    llenarComboModelos(document.getElementById("combo-modelo-docs"), t("cod_todos"));
+    if (!ultimaBusquedaDocs) mostrarAviso("resultados-docs", t("docs_inicio"));
+    else renderizarDocs(ultimaBusquedaDocs);
+
     const headers = document.querySelectorAll("#tabla-headers th");
     const keysHeaders = ["col_no", "col_arballon", "col_cant", "col_name", "col_partno", "col_count", "col_vida", "col_pct", "col_reset", "col_estado"];
     headers.forEach((th, i) => { th.textContent = t(keysHeaders[i]); });
@@ -1869,7 +2056,7 @@ async function extraerPaginasPdf(file, mod) {
 }
 
 // ================= EVENTOS DE CONTROLES =================
-const PESTANAS = ["partes", "manual", "codigos"];
+const PESTANAS = ["partes", "manual", "codigos", "mant", "docs"];
 
 function mostrarPestana(nombre) {
     PESTANAS.forEach(p => {
@@ -1877,6 +2064,8 @@ function mostrarPestana(nombre) {
         document.getElementById(`btn-tab-${p}`).classList.toggle("btn-tab-active", p === nombre);
     });
     if (nombre === "codigos") document.getElementById("entrada-codigo").focus();
+    if (nombre === "mant") cargarMantenimiento(document.getElementById("combo-modelo-mant").value);
+    if (nombre === "docs") document.getElementById("entrada-docs").focus();
 }
 
 PESTANAS.forEach(p => {
@@ -1889,6 +2078,29 @@ document.getElementById("entrada-codigo").addEventListener("keydown", (e) => {
 });
 document.getElementById("combo-modelo-codigo").addEventListener("change", () => {
     if (document.getElementById("entrada-codigo").value.trim()) buscarCodigosError();
+});
+
+document.getElementById("combo-modelo-mant").addEventListener("change", (e) => {
+    document.getElementById("combo-unidad-mant").value = "";
+    cargarMantenimiento(e.target.value);
+    llenarFiltrosMantenimiento();
+    renderizarMantenimiento();
+});
+["combo-unidad-mant", "combo-accion-mant"].forEach(id => {
+    document.getElementById(id).addEventListener("change", renderizarMantenimiento);
+});
+document.getElementById("entrada-mant").addEventListener("input", renderizarMantenimiento);
+
+document.getElementById("btn-buscar-docs").addEventListener("click", buscarEnManuales);
+document.getElementById("entrada-docs").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") buscarEnManuales();
+});
+document.getElementById("combo-modelo-docs").addEventListener("change", () => {
+    if (document.getElementById("entrada-docs").value.trim()) buscarEnManuales();
+});
+document.getElementById("resultados-docs").addEventListener("click", (e) => {
+    const boton = e.target.closest(".btn-ver-pagina");
+    if (boton) alternarPaginaCompleta(boton);
 });
 
 document.getElementById("btn-cargar-txt").addEventListener("click", () => {
@@ -2171,21 +2383,31 @@ function resaltarPalabras(texto, palabras) {
     return String(texto).split(patron).map((parte, i) => i % 2 ? `<mark>${escaparHtml(parte)}</mark>` : escaparHtml(parte)).join("");
 }
 
-function llenarComboModeloCodigo() {
-    const combo = document.getElementById("combo-modelo-codigo");
+// Llena un <select> con los equipos que tienen manual; con textoTodos agrega la opción "todos" (valor "")
+function llenarComboModelos(combo, textoTodos) {
     const actual = combo.value;
     combo.innerHTML = "";
-    [["", t("cod_todos")], ...MODELOS_MANUALES.map(m => [m, m])].forEach(([valor, texto]) => {
+    const opciones = MODELOS_MANUALES.map(m => [m, m]);
+    if (textoTodos) opciones.unshift(["", textoTodos]);
+    opciones.forEach(([valor, texto]) => {
         const op = document.createElement("option");
         op.value = valor;
         op.textContent = texto;
         combo.appendChild(op);
     });
-    combo.value = actual;
+    if (opciones.some(([valor]) => valor === actual)) combo.value = actual;
+}
+
+function llenarComboModeloCodigo() {
+    llenarComboModelos(document.getElementById("combo-modelo-codigo"), t("cod_todos"));
 }
 
 function mostrarAvisoCodigos(texto) {
-    const cont = document.getElementById("resultados-codigos");
+    mostrarAviso("resultados-codigos", texto);
+}
+
+function mostrarAviso(idContenedor, texto) {
+    const cont = document.getElementById(idContenedor);
     cont.innerHTML = "";
     const aviso = document.createElement("div");
     aviso.className = "codigos-aviso";
@@ -2280,6 +2502,211 @@ function renderizarCodigos({ consulta, palabras, filas, total }) {
             </div>${campos}
         </div>`;
     }).join("");
+}
+
+// ================= MANTENIMIENTO PERIÓDICO (MANUALES DE SERVICIO EN SUPABASE) =================
+const SUPABASE_TABLA_MANT = "manual_mantenimiento";
+const ACCIONES_MANT = ["Reemplazo", "Limpieza", "Lubricación", "Revisión"];
+const CLASE_ACCION = { "Reemplazo": "reemplazo", "Limpieza": "limpieza", "Lubricación": "lubricacion", "Revisión": "revision" };
+const COLUMNAS_MANT = ["mant_col_unidad", "mant_col_seccion", "mant_col_desc", "mant_col_parts", "mant_col_cant", "mant_col_intervalo", "mant_col_accion", "mant_col_obs"];
+const mantPorModelo = {}; // modelo -> filas | "cargando" | "error"
+
+async function cargarMantenimiento(modelo) {
+    if (!modelo || Array.isArray(mantPorModelo[modelo]) || mantPorModelo[modelo] === "cargando") return;
+    mantPorModelo[modelo] = "cargando";
+    renderizarMantenimiento();
+    try {
+        const filas = [];
+        for (let desde = 0; ; desde += SUPABASE_PAGINA) {
+            const resp = await fetch(
+                `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLA_MANT}?select=unidad,tipo,intervalo,intervalo_unidad,seccion,descripcion,parts_no,cantidad,accion,observacion&modelo=eq.${encodeURIComponent(modelo)}&order=id.asc`,
+                { headers: { apikey: SUPABASE_KEY, Range: `${desde}-${desde + SUPABASE_PAGINA - 1}` } }
+            );
+            if (!resp.ok && resp.status !== 416) throw new Error(`HTTP ${resp.status}`);
+            const pagina = resp.status === 416 ? [] : await resp.json();
+            filas.push(...pagina);
+            if (pagina.length < SUPABASE_PAGINA) break;
+        }
+        mantPorModelo[modelo] = filas;
+    } catch (err) {
+        console.warn("No se pudo cargar el mantenimiento desde Supabase:", err);
+        mantPorModelo[modelo] = "error";
+    }
+    if (document.getElementById("combo-modelo-mant").value === modelo) {
+        llenarFiltrosMantenimiento();
+        renderizarMantenimiento();
+    }
+}
+
+function llenarFiltrosMantenimiento() {
+    llenarComboModelos(document.getElementById("combo-modelo-mant"), null);
+    const filas = mantPorModelo[document.getElementById("combo-modelo-mant").value];
+    const unidades = Array.isArray(filas) ? [...new Set(filas.map(f => f.unidad).filter(Boolean))] : [];
+
+    const llenar = (combo, opciones) => {
+        const actual = combo.value;
+        combo.innerHTML = "";
+        [["", t("mant_todas")], ...opciones].forEach(([valor, texto]) => {
+            const op = document.createElement("option");
+            op.value = valor;
+            op.textContent = texto;
+            combo.appendChild(op);
+        });
+        combo.value = opciones.some(([valor]) => valor === actual) ? actual : "";
+    };
+    llenar(document.getElementById("combo-unidad-mant"), unidades.map(u => [u, u]));
+    llenar(document.getElementById("combo-accion-mant"), ACCIONES_MANT.map(a => [a, t(`acc_${a}`)]));
+}
+
+function formatearIntervalo(fila) {
+    if (fila.intervalo === null || fila.intervalo === undefined) return "—";
+    const numero = Number(fila.intervalo).toLocaleString(idiomaActual === "en" ? "en-US" : "es-AR");
+    const unidad = fila.intervalo_unidad === "counts" ? t("mant_counts") : (fila.intervalo_unidad || "");
+    return `${numero} ${unidad}`.trim();
+}
+
+function renderizarMantenimiento() {
+    const encabezado = document.getElementById("tabla-mant-headers");
+    encabezado.innerHTML = COLUMNAS_MANT.map(c => `<th class="align-l">${escaparHtml(t(c))}</th>`).join("");
+    const cuerpo = document.getElementById("tabla-mant-body");
+    const aviso = document.getElementById("aviso-mant");
+    const lblTotal = document.getElementById("lbl-mant-total");
+
+    const filas = mantPorModelo[document.getElementById("combo-modelo-mant").value];
+    if (!Array.isArray(filas)) {
+        cuerpo.innerHTML = "";
+        lblTotal.textContent = "";
+        aviso.textContent = filas === "error" ? t("mant_sin_conexion") : t("mant_cargando");
+        return;
+    }
+
+    const unidad = document.getElementById("combo-unidad-mant").value;
+    const accion = document.getElementById("combo-accion-mant").value;
+    const palabras = document.getElementById("entrada-mant").value.toLowerCase().split(/\s+/).filter(Boolean);
+    const visibles = filas.filter(f => {
+        if (unidad && f.unidad !== unidad) return false;
+        if (accion && !(f.accion || "").split(", ").includes(accion)) return false;
+        const texto = [f.descripcion, f.parts_no, f.seccion, f.observacion, f.unidad].join(" ").toLowerCase();
+        return palabras.every(p => texto.includes(p));
+    });
+
+    lblTotal.textContent = t("mant_total").replace("{n}", visibles.length);
+    aviso.textContent = visibles.length ? "" : t("mant_sin_filas");
+    cuerpo.innerHTML = visibles.map((f, i) => {
+        const acciones = (f.accion || "").split(", ").filter(Boolean)
+            .map(a => `<span class="accion-chip ${CLASE_ACCION[a] || ""}">${escaparHtml(t(`acc_${a}`))}</span>`).join(" ");
+        const puntual = f.tipo === "Reemplazo puntual"
+            ? `<div style="font-size:11px; color:var(--texto-gris);">${escaparHtml(t("mant_puntual"))}</div>` : "";
+        return `<tr class="${i % 2 ? "impar" : "par"}">
+            <td class="ajustar">${escaparHtml(f.unidad || "")}</td>
+            <td class="ajustar">${escaparHtml(f.seccion || "")}</td>
+            <td class="ajustar" style="font-weight:600;">${resaltarPalabras(f.descripcion || "", palabras)}</td>
+            <td>${resaltarPalabras(f.parts_no || "", palabras)}</td>
+            <td class="num">${f.cantidad ?? ""}</td>
+            <td class="num" style="white-space:nowrap;">${escaparHtml(formatearIntervalo(f))}${puntual}</td>
+            <td>${acciones}</td>
+            <td class="obs">${escaparHtml(f.observacion || "")}</td>
+        </tr>`;
+    }).join("");
+}
+
+// ================= BÚSQUEDA EN EL TEXTO COMPLETO DE LOS MANUALES (SUPABASE) =================
+const SUPABASE_TABLA_PAGINAS = "manual_paginas";
+const LIMITE_DOCS = 30;
+let ultimaBusquedaDocs = null; // { consulta, palabras, filas, total }
+let busquedaDocsId = 0;
+const textoPaginaCache = {};
+
+// Palabras a resaltar al abrir una página: sin comillas, sin las excluidas con "-" y sin las muy cortas
+function palabrasDeConsulta(consulta) {
+    return consulta.replace(/"/g, " ").split(/\s+/).filter(p => p && !p.startsWith("-") && p.toLowerCase() !== "or" && p.length >= 3);
+}
+
+async function buscarEnManuales() {
+    const consulta = document.getElementById("entrada-docs").value.trim();
+    const modelo = document.getElementById("combo-modelo-docs").value;
+    document.getElementById("lbl-docs-total").textContent = "";
+    if (!consulta) {
+        ultimaBusquedaDocs = null;
+        mostrarAviso("resultados-docs", t("docs_inicio"));
+        return;
+    }
+
+    const id = ++busquedaDocsId;
+    mostrarAviso("resultados-docs", t("docs_buscando"));
+    try {
+        const resp = await fetch(`${SUPABASE_URL}/rest/v1/rpc/buscar_manual`, {
+            method: "POST",
+            headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
+            body: JSON.stringify({ consulta, equipo: modelo || null, limite: LIMITE_DOCS })
+        });
+        if (id !== busquedaDocsId) return; // llegó una búsqueda más nueva
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const filas = await resp.json();
+        ultimaBusquedaDocs = { consulta, palabras: palabrasDeConsulta(consulta), filas, total: filas.length ? Number(filas[0].total) : 0 };
+        renderizarDocs(ultimaBusquedaDocs);
+    } catch (err) {
+        if (id !== busquedaDocsId) return;
+        console.warn("No se pudo buscar en los manuales de Supabase:", err);
+        ultimaBusquedaDocs = null;
+        mostrarAviso("resultados-docs", t("cod_sin_conexion"));
+    }
+}
+
+function renderizarDocs({ consulta, filas, total }) {
+    const lblTotal = document.getElementById("lbl-docs-total");
+    if (!filas.length) {
+        lblTotal.textContent = "";
+        mostrarAviso("resultados-docs", t("docs_sin_resultados").replace("{q}", consulta));
+        return;
+    }
+    lblTotal.textContent = total > filas.length
+        ? t("docs_total_parcial").replace("{n}", filas.length).replace("{total}", total)
+        : t("docs_total").replace("{n}", total);
+
+    document.getElementById("resultados-docs").innerHTML = filas.map(f => {
+        const fragmento = escaparHtml(f.fragmento || "").replace(/\[\[([\s\S]*?)\]\]/g, "<mark>$1</mark>");
+        return `<div class="codigo-card">
+            <div class="codigo-card-head">
+                <span class="codigo-modelo">${escaparHtml(f.modelo)}</span>
+                <span class="codigo-titulo">${escaparHtml(f.titulo || "")}</span>
+            </div>
+            <div class="doc-ruta">${escaparHtml(f.ruta || "")}</div>
+            <div class="codigo-campo-txt">${fragmento}</div>
+            <button class="btn btn-mini btn-ver-pagina" data-id="${Number(f.id)}">${escaparHtml(t("docs_ver"))}</button>
+        </div>`;
+    }).join("");
+}
+
+async function alternarPaginaCompleta(boton) {
+    const tarjeta = boton.closest(".codigo-card");
+    const abierta = tarjeta.querySelector(".doc-texto");
+    if (abierta) {
+        abierta.remove();
+        boton.textContent = t("docs_ver");
+        return;
+    }
+    const div = document.createElement("div");
+    div.className = "doc-texto";
+    div.textContent = t("docs_cargando_pagina");
+    tarjeta.insertBefore(div, boton);
+    boton.textContent = t("docs_ocultar");
+
+    const id = boton.dataset.id;
+    try {
+        if (!(id in textoPaginaCache)) {
+            const resp = await fetch(`${SUPABASE_URL}/rest/v1/${SUPABASE_TABLA_PAGINAS}?select=texto&id=eq.${id}`, {
+                headers: { apikey: SUPABASE_KEY }
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const filas = await resp.json();
+            textoPaginaCache[id] = filas.length ? (filas[0].texto || "") : "";
+        }
+        div.innerHTML = resaltarPalabras(textoPaginaCache[id], ultimaBusquedaDocs ? ultimaBusquedaDocs.palabras : []);
+    } catch (err) {
+        console.warn("No se pudo cargar la página del manual:", err);
+        div.textContent = t("cod_sin_conexion");
+    }
 }
 
 async function cargarArballonSupabase() {
