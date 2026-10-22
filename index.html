@@ -620,6 +620,16 @@
     </div>
 
     <!-- Modal de Edición (Clic Derecho) -->
+    <div id="modal-instalar" class="modal-overlay">
+        <div class="modal-card" style="width:520px;">
+            <div id="lbl-instalar-titulo" style="font-size:15px; font-weight:bold; margin-bottom:14px;"></div>
+            <div id="lbl-instalar-pasos" style="font-size:13px; line-height:1.55; text-align:left; white-space:pre-line;"></div>
+            <div style="display:flex; justify-content:center; margin-top:18px;">
+                <button id="btn-cerrar-instalar" class="btn btn-accent" style="min-width:140px;"></button>
+            </div>
+        </div>
+    </div>
+
     <div id="modal-edicion" class="modal-overlay">
         <div class="modal-card">
             <div id="edit-titulo-parte" style="font-size:14px; font-weight:bold; margin-bottom:10px;"></div>
@@ -726,6 +736,13 @@ const TRADUCCIONES = {
         "idioma_espanol": "🇪🇸 Español",
         "cargar_txt": "📂 Cargar List Output (.txt)",
         "instalar_app": "💻 Instalar app",
+        "instalar_titulo": "💻 Instalar KM Station en esta PC",
+        "instalar_chrome": "1. Mirá a la derecha de la barra de direcciones: si aparece un ícono de pantalla con una flecha (⊕ / ⬇), hacé clic ahí y elegí \"Instalar\".\n\n2. Si no está, abrí el menú ⋮ (arriba a la derecha) → \"Transmitir, guardar y compartir\" → \"Instalar página como app...\".\n\nSi no aparece ninguna opción, recargá con Ctrl + Shift + R y esperá unos segundos.",
+        "instalar_edge": "1. Mirá a la derecha de la barra de direcciones: si aparece \"App disponible\" o un ícono ⊞, hacé clic y elegí \"Instalar\".\n\n2. Si no está, abrí el menú ··· (arriba a la derecha) → \"Aplicaciones\" → \"Instalar este sitio como una aplicación\".\n\nSi no aparece ninguna opción, recargá con Ctrl + Shift + R y esperá unos segundos.",
+        "instalar_safari": "En Safari (Mac): menú \"Archivo\" → \"Agregar al Dock...\".\n\nEn iPhone / iPad: botón Compartir → \"Agregar a pantalla de inicio\".",
+        "instalar_firefox": "Firefox no permite instalar aplicaciones web.\n\nAbrí esta misma dirección en Google Chrome o Microsoft Edge y tocá de nuevo \"Instalar app\".",
+        "instalar_archivo": "La app se está abriendo como archivo suelto y así no se puede instalar.\n\nAbrila desde https://kmtechstation.netlify.app en Chrome o Edge y tocá de nuevo \"Instalar app\".",
+        "entendido": "Entendido",
         "analisis_txt": "📊 Análisis de List Output",
         "manual_pdf": "📘 Manuales PDF y CSV por Modelo",
         "buscar": "🔍 Filtrar:",
@@ -776,6 +793,13 @@ const TRADUCCIONES = {
         "idioma_espanol": "🇪🇸 Spanish",
         "cargar_txt": "📂 Load List Output (.txt)",
         "instalar_app": "💻 Install app",
+        "instalar_titulo": "💻 Install KM Station on this PC",
+        "instalar_chrome": "1. Look at the right side of the address bar: if there is a screen-with-arrow icon (⊕ / ⬇), click it and choose \"Install\".\n\n2. If it isn't there, open the ⋮ menu (top right) → \"Cast, save and share\" → \"Install page as app...\".\n\nIf no option shows up, reload with Ctrl + Shift + R and wait a few seconds.",
+        "instalar_edge": "1. Look at the right side of the address bar: if \"App available\" or a ⊞ icon appears, click it and choose \"Install\".\n\n2. If it isn't there, open the ··· menu (top right) → \"Apps\" → \"Install this site as an app\".\n\nIf no option shows up, reload with Ctrl + Shift + R and wait a few seconds.",
+        "instalar_safari": "In Safari (Mac): \"File\" menu → \"Add to Dock...\".\n\nOn iPhone / iPad: Share button → \"Add to Home Screen\".",
+        "instalar_firefox": "Firefox can't install web apps.\n\nOpen this same address in Google Chrome or Microsoft Edge and click \"Install app\" again.",
+        "instalar_archivo": "The app is open as a local file, and it can't be installed that way.\n\nOpen it from https://kmtechstation.netlify.app in Chrome or Edge and click \"Install app\" again.",
+        "entendido": "Got it",
         "analisis_txt": "📊 List Output Analysis",
         "manual_pdf": "📘 PDF Manuals & CSV per Model",
         "buscar": "🔍 Filter:",
@@ -1989,20 +2013,40 @@ if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {
 
 let eventoInstalacion = null;
 const btnInstalar = document.getElementById("btn-instalar-app");
+const yaInstalada = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
 
-// Chrome / Edge avisan cuando la app se puede instalar; recién ahí mostramos el botón
+// El botón se muestra siempre en el navegador; dentro de la app instalada se oculta
+btnInstalar.hidden = yaInstalada;
+
+// Chrome / Edge avisan cuando la app se puede instalar directo desde el botón
 window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     eventoInstalacion = e;
-    btnInstalar.hidden = false;
 });
 
 btnInstalar.addEventListener("click", async () => {
-    if (!eventoInstalacion) return;
-    eventoInstalacion.prompt();
-    await eventoInstalacion.userChoice;
-    eventoInstalacion = null;
-    btnInstalar.hidden = true;
+    if (eventoInstalacion) {
+        eventoInstalacion.prompt();
+        const { outcome } = await eventoInstalacion.userChoice;
+        eventoInstalacion = null;
+        if (outcome === "accepted") btnInstalar.hidden = true;
+        return;
+    }
+    // Sin instalación directa disponible: mostrar los pasos según el navegador
+    const ua = navigator.userAgent;
+    let clave = "instalar_chrome";
+    if (location.protocol === "file:") clave = "instalar_archivo";
+    else if (/Edg\//.test(ua)) clave = "instalar_edge";
+    else if (/Firefox\//.test(ua)) clave = "instalar_firefox";
+    else if (/Safari\//.test(ua) && !/Chrome\/|Chromium\//.test(ua)) clave = "instalar_safari";
+    document.getElementById("lbl-instalar-titulo").textContent = t("instalar_titulo");
+    document.getElementById("lbl-instalar-pasos").textContent = t(clave);
+    document.getElementById("btn-cerrar-instalar").textContent = t("entendido");
+    document.getElementById("modal-instalar").classList.add("active");
+});
+
+document.getElementById("btn-cerrar-instalar").addEventListener("click", () => {
+    document.getElementById("modal-instalar").classList.remove("active");
 });
 
 window.addEventListener("appinstalled", () => {
