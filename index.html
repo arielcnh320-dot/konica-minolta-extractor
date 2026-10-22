@@ -779,6 +779,9 @@ const TRADUCCIONES = {
         "modal_cargando_excel": "Cargando Base Excel...",
         "modal_buscando_pdf": "Buscando en el Manual PDF...",
         "modal_extrayendo_pdf": "Cruzando CSV con Manual de Servicio PDF...",
+        "modal_supabase": "Conectando con Supabase (tabla Arballon)...",
+        "supabase_ok": "Supabase · arballon",
+        "supabase_offline": "Supabase sin conexión · copia guardada",
         "copiado_msg": "Copiado al portapapeles:"
     },
     "en": {
@@ -836,9 +839,20 @@ const TRADUCCIONES = {
         "modal_cargando_excel": "Loading Excel Database...",
         "modal_buscando_pdf": "Searching in PDF Manual...",
         "modal_extrayendo_pdf": "Crossing CSV with PDF Service Manual...",
+        "modal_supabase": "Connecting to Supabase (Arballon table)...",
+        "supabase_ok": "Supabase · arballon",
+        "supabase_offline": "Supabase offline · saved copy",
         "copiado_msg": "Copied to clipboard:"
     }
 };
+
+// ================= CONEXIÓN SUPABASE =================
+// La clave publicable es pública por diseño: solo permite lo que habilitan las políticas RLS
+// (la tabla "arballon" tiene lectura pública y nada más).
+const SUPABASE_URL = "https://xftdfrdlrrcwedfsdvob.supabase.co";
+const SUPABASE_KEY = "sb_publishable_K2dtd6yJbwrc1RIazgDftg_rkXL_D6t";
+const SUPABASE_TABLA_ARBALLON = "arballon";
+const SUPABASE_PAGINA = 1000; // Supabase devuelve como máximo 1000 filas por pedido
 
 // ================= ESTADO DE LA APLICACIÓN =================
 let configApp = cargarConfig();
@@ -2001,8 +2015,46 @@ document.querySelectorAll("#tabla-headers th").forEach(th => {
     });
 });
 
+// Descarga la tabla Arballon completa desde Supabase y la usa como base de referencia.
+// Si no hay conexión, se sigue usando la última copia guardada en el navegador.
+async function cargarArballonSupabase() {
+    mostrarProgreso(t("modal_supabase"), 0.05);
+    try {
+        const filas = [];
+        for (let desde = 0; ; desde += SUPABASE_PAGINA) {
+            const resp = await fetch(
+                `${SUPABASE_URL}/rest/v1/${SUPABASE_TABLA_ARBALLON}?select=*&order=${encodeURIComponent('"Codigo Arballon"')}.asc`,
+                { headers: { apikey: SUPABASE_KEY, Range: `${desde}-${desde + SUPABASE_PAGINA - 1}`, Prefer: "count=exact" } }
+            );
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const pagina = await resp.json();
+            filas.push(...pagina);
+
+            // Content-Range: "0-999/4389" -> total de filas para la barra de progreso
+            const total = parseInt((resp.headers.get("Content-Range") || "").split("/")[1]) || 0;
+            if (total) mostrarProgreso(t("modal_supabase"), Math.min(filas.length / total, 1));
+            if (pagina.length < SUPABASE_PAGINA || (total && filas.length >= total)) break;
+        }
+        if (!filas.length) throw new Error("tabla vacía");
+
+        dfReferencia = filas;
+        nombreExcelActual = t("supabase_ok");
+        try {
+            localStorage.setItem("km_excel_data", JSON.stringify(dfReferencia));
+            localStorage.setItem("km_excel_nombre", nombreExcelActual);
+        } catch (err) {}
+    } catch (err) {
+        console.warn("No se pudo cargar Arballon desde Supabase:", err);
+        if (dfReferencia.length) nombreExcelActual = t("supabase_offline");
+    }
+    if (contenidoTxtActual) parsearSpecialPartsPuro(contenidoTxtActual);
+    actualizarVista();
+    ocultarProgreso();
+}
+
 // Inicializar aplicación
 actualizarTextosIdioma();
+cargarArballonSupabase();
 
 // App instalable (PWA): Service Worker y botón "Instalar app"
 if ("serviceWorker" in navigator && location.protocol.startsWith("http")) {

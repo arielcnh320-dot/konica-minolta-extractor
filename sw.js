@@ -4,7 +4,10 @@
 // - Las librerías de los CDN (SheetJS y PDF.js) tienen versión fija, así que se sirven desde la caché.
 // Cambiar VERSION cuando se agreguen archivos nuevos a la lista de precarga.
 
-const VERSION = "km-station-v1";
+const VERSION = "km-station-v2";
+
+// Solo estos dominios se guardan en caché; el resto (por ejemplo Supabase) va siempre directo a la red
+const CDN_CACHEABLES = ["cdn.jsdelivr.net", "cdnjs.cloudflare.com"];
 
 const PRECARGA = [
     "./",
@@ -57,6 +60,8 @@ self.addEventListener("fetch", (event) => {
         );
         return;
     }
+
+    if (!CDN_CACHEABLES.includes(url.hostname)) return;
 
     // Librerías de CDN versionadas: caché primero
     event.respondWith(
