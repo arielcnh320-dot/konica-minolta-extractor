@@ -1133,8 +1133,19 @@ function edicionDeParte(modelo, nombreParte) {
 function cargarExcelCacheLocal() {
     try {
         const guardado = localStorage.getItem("km_excel_data");
-        return guardado ? JSON.parse(guardado) : [];
+        return guardado ? normalizarCodigosArballon(JSON.parse(guardado)) : [];
     } catch (e) { return []; }
+}
+
+// En Supabase el código Arballon es numérico y pierde el 0 inicial: se muestra siempre con 8 cifras (03164800).
+function normalizarCodigosArballon(filas) {
+    for (const f of filas) {
+        const codigo = f["Codigo Arballon"];
+        if (codigo !== null && codigo !== undefined && /^\d+$/.test(String(codigo))) {
+            f["Codigo Arballon"] = String(codigo).padStart(8, "0");
+        }
+    }
+    return filas;
 }
 
 function t(clave) {
@@ -2663,7 +2674,7 @@ async function cargarArballonSupabase() {
         }
         if (!filas.length) throw new Error("tabla vacía");
 
-        dfReferencia = filas;
+        dfReferencia = normalizarCodigosArballon(filas);
         nombreExcelActual = t("supabase_ok");
         try {
             localStorage.setItem("km_excel_data", JSON.stringify(dfReferencia));
