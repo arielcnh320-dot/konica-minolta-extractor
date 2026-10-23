@@ -13,8 +13,6 @@
     <meta name="apple-mobile-web-app-title" content="KM Station">
     <!-- Librería SheetJS con soporte de estilos (Excel y CSV) -->
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
-    <!-- Librería PDF.js para leer y buscar dentro de Manuales de Servicio PDF -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <style>
         :root {
             /* Fondo y vidrio */
@@ -430,25 +428,6 @@
             flex-shrink: 0;
         }
 
-        /* Pestaña Manual PDF */
-        .pdf-results {
-            flex: 1;
-            background: rgba(0, 0, 0, 0.22);
-            backdrop-filter: var(--blur);
-            -webkit-backdrop-filter: var(--blur);
-            border: 1px solid var(--glass-border);
-            border-radius: var(--radius-panel);
-            box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
-            padding: 16px 18px;
-            font-family: "Consolas", "Segoe UI", monospace;
-            font-size: 13px;
-            line-height: 1.5;
-            color: var(--texto-blanco);
-            overflow-y: auto;
-            white-space: pre-wrap;
-            user-select: text;
-        }
-
         /* Pestaña Códigos de error */
         .codigos-results {
             flex: 1;
@@ -633,7 +612,7 @@
 
         /* Navegadores sin backdrop-filter: vidrio más opaco para mantener legibilidad */
         @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-            .panel, .pdf-results { background: rgba(22, 28, 52, 0.92); }
+            .panel { background: rgba(22, 28, 52, 0.92); }
             .modal-card { background: rgba(28, 34, 62, 0.97); }
         }
 
@@ -646,9 +625,6 @@
 
     <!-- Inputs de archivos ocultos -->
     <input type="file" id="file-txt" accept=".txt" style="display:none">
-    <input type="file" id="file-excel" accept=".xlsx,.xls" style="display:none">
-    <input type="file" id="file-csv" accept=".csv" style="display:none">
-    <input type="file" id="file-pdf" accept=".pdf" style="display:none">
 
     <!-- Barra Superior -->
     <div class="panel top-bar">
@@ -660,7 +636,6 @@
     <!-- Pestañas -->
     <div class="panel tab-bar">
         <button id="btn-tab-partes" class="btn btn-tab-active"></button>
-        <button id="btn-tab-manual" class="btn"></button>
         <button id="btn-tab-codigos" class="btn"></button>
         <button id="btn-tab-mant" class="btn"></button>
         <button id="btn-tab-docs" class="btn"></button>
@@ -696,6 +671,7 @@
                             <th data-col="Parts No" class="align-c"></th>
                             <th data-col="Count" class="align-r"></th>
                             <th data-col="Vida_Util" class="align-r"></th>
+                            <th data-col="Fuente" class="align-c"></th>
                             <th data-col="Porcentaje" class="align-r"></th>
                             <th data-col="ResetCount" class="align-c"></th>
                             <th data-col="Estado" class="align-c"></th>
@@ -706,27 +682,6 @@
             </div>
 
             <div class="panel status-bar" id="lbl-estado"></div>
-        </div>
-
-        <!-- Pestaña 2: Manuales PDF y CSV por Modelo -->
-        <div id="tab-manual" class="tab-view">
-            <div class="panel filter-bar">
-                <strong id="lbl-manual-mod" style="font-size:13px;"></strong>
-                <select id="combo-modelo-pdf" class="input-text" style="width:130px;"></select>
-                <button id="btn-vincular-pdf" class="btn" style="min-width:190px; height:34px;"></button>
-                <button id="btn-vincular-csv" class="btn" style="min-width:180px; height:34px;"></button>
-                <button id="btn-cruzar-ambos" class="btn btn-accent" style="min-width:160px; height:34px;"></button>
-                <span id="lbl-pdf-actual" style="font-size:12px; color:var(--texto-gris);"></span>
-                <button id="btn-abrir-pdf" class="btn btn-green" style="height:34px; margin-left:auto;"></button>
-            </div>
-
-            <div class="panel filter-bar">
-                <span id="lbl-error-busq" style="font-size:13px;"></span>
-                <input type="text" id="entrada-error-pdf" class="input-text" style="width:320px;">
-                <button id="btn-buscar-pdf" class="btn btn-accent" style="min-width:160px; height:34px;"></button>
-            </div>
-
-            <div id="txt-resultados-pdf" class="pdf-results"></div>
         </div>
 
         <!-- Pestaña 3: Códigos de error de los manuales de servicio (Supabase) -->
@@ -839,16 +794,11 @@
     </div>
 
 <script>
-// Configuración del Worker de PDF.js
-if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-}
-
 // ================= CONSTANTES Y TABLAS DE FÁBRICA =================
 const MODELOS_INICIALES = [
     "C14000", "C14010", "C7100", "C6100", "C6080", "C5080", "C5065",
     "C4080", "C4065", "C3080", "C3070L", "C3065L",
-    "C2080", "C2060", "C1070", "C1060", "PRO1100", "AP2100", "6136"
+    "C2080", "C2060", "C1070", "C1060", "PRO1100", "AP2100", "6136", "7136"
 ];
 
 const PREFIJOS_SERIE = {
@@ -859,70 +809,10 @@ const PREFIJOS_SERIE = {
     "A5B0": "C2080",  "A1U8": "C6080",  "A1U9": "C6100"
 };
 
-const VIDAS_OFICIALES_FABRICA = {
-    "C6100": {
-        "65AA4618": 1500000, "TORQUE LIMITER": 1500000,
-        "A5AW7217": 900000, "A50U7563": 900000, "HEAT INSULATING SLEEVE": 900000,
-        "A1U85010": 420000, "CHARGING CORONA": 420000,
-        "A1U85020": 900000, "FUSING BELT": 900000,
-        "A1U85030": 600000, "FILTER BOX": 600000,
-        "A1U85040": 350000, "TRANSFER BELT": 350000,
-        "A1U85050": 2150000, "DEVELOPING UNIT": 2150000,
-        "A1U85060": 150000
-    },
-    "C6080": {
-        "65AA4618": 1500000, "TORQUE LIMITER": 1500000,
-        "A5AW7217": 900000, "A50U7563": 900000, "HEAT INSULATING SLEEVE": 900000,
-        "CHARGING CORONA": 420000, "FUSING BELT": 900000, "FILTER BOX": 600000,
-        "TRANSFER BELT": 350000, "DEVELOPING UNIT": 2150000, "WASTE TONER BOX": 150000
-    },
-    "C7100": {
-        "65AA4618": 1500000, "TORQUE LIMITER": 1500000,
-        "A5AW7217": 900000, "A50U7563": 900000,
-        "CHARGING CORONA": 420000, "FUSING BELT": 900000,
-        "HEAT INSULATING SLEEVE": 900000, "FUSING PAPER EXIT ROLLER": 900000,
-        "FILTER BOX": 600000, "TRANSFER BELT": 350000, "INT.TRANS.UNIT": 350000,
-        "DEVELOPING UNIT": 2150000, "WASTE TONER BOX": 150000,
-        "2ND TRANSFER ROLLER/LW": 700000, "2ND TRANSFER ROLLER/UP": 800000,
-        "TRANSFER BELT GUIDE": 800000
-    },
-    "C14000": {
-        "CHARGING CORONA": 500000, "FUSING BELT": 1000000,
-        "TRANSFER BELT": 400000, "DEVELOPING UNIT": 2500000, "WASTE TONER BOX": 200000
-    },
-    "C14010": {
-        "CHARGING CORONA": 500000, "FUSING BELT": 1000000,
-        "TRANSFER BELT": 400000, "DEVELOPING UNIT": 2500000, "WASTE TONER BOX": 200000
-    }
-};
-
-const CANTIDADES_GLOBALES_POR_CODIGO = {
-    "A5AW7217": 2, "A50U7563": 2, "A1U87216": 2, "A9VP7361": 2,
-    "A9VP7519": 2, "AC0C7217": 2, "A50U7655": 2, "A5AW7655": 2,
-    "A1U87655": 2, "A9VP7655": 2, "A50U7537": 2, "A5AW7537": 2
-};
-
-const CANTIDADES_GLOBALES_POR_NOMBRE = {
-    "HEAT INSULATING SLEEVE": 2, "INSULATING SLEEVE": 2, "FUSING BEARING": 2,
-    "PRESSURE ROLLER BEARING": 2, "UPPER ROLLER BEARING": 2, "LOWER ROLLER BEARING": 2,
-    "FUSING BELT BEARING": 2, "BEARING/UP": 2, "BEARING/LW": 2,
-    "BEARING/1": 2, "BEARING/2": 2, "BUSHING/UP": 2,
-    "BUSHING/LW": 2, "BUSHING/1": 2, "BUSHING/2": 2
-};
-
-const CANTIDADES_EQUIPO_FABRICA = {
-    "C6100": { "A5AW7217": 2, "HEAT INSULATING SLEEVE": 2, "FUSING BEARING": 2, "OZONE FILTER": 1 },
-    "C7100": { "A5AW7217": 2, "HEAT INSULATING SLEEVE": 2, "FUSING BEARING": 2 }
-};
-
 const TRADUCCIONES = {
     "es": {
         "titulo_ventana": "Konica Minolta Technical Station - Windows 11 Edition",
         "opciones": "⚙️ Opciones",
-        "agregar_modelo": "➕ Agregar Modelo",
-        "base_excel": "🔄 Base Excel (Arballon/Vidas)",
-        "vincular_csv_menu": "📄 Vincular CSV de Cantidades (Modelo Activo)",
-        "extraer_vidas_pdf": "⚡ Cruzar CSV + Manual PDF (Autocompletar)",
         "exportar_excel": "📊 Exportar Excel",
         "idioma_ingles": "🇬🇧 English",
         "idioma_espanol": "🇪🇸 Español",
@@ -936,7 +826,6 @@ const TRADUCCIONES = {
         "instalar_archivo": "La app se está abriendo como archivo suelto y así no se puede instalar.\n\nAbrila desde https://kmtechstation.netlify.app en Chrome o Edge y tocá de nuevo \"Instalar app\".",
         "entendido": "Entendido",
         "analisis_txt": "📊 Análisis de List Output",
-        "manual_pdf": "📘 Manuales PDF y CSV por Modelo",
         "codigos_error": "🚨 Códigos de error",
         "cod_modelo": "Equipo:",
         "cod_todos": "Todos",
@@ -995,7 +884,7 @@ const TRADUCCIONES = {
         "rep_tab": "🔩 Repuestos",
         "rep_modelo": "Equipo:",
         "rep_clase": "Clase:",
-        "rep_placeholder": "Buscar: Parts No., nombre, página, PMN...",
+        "rep_placeholder": "Buscar: Arballon, Parts No., nombre, página...",
         "rep_cargando": "Cargando el catálogo de repuestos desde Supabase...",
         "rep_sin_conexion": "No se pudo cargar el catálogo de repuestos desde Supabase. Revisá la conexión a internet y volvé a abrir la pestaña.",
         "rep_sin_filas": "No hay repuestos con estos filtros.",
@@ -1012,22 +901,16 @@ const TRADUCCIONES = {
         "rep_col_pmn": "PMN No.",
         "rep_en_catalogo": "Catálogo: {nombre} · pág. {pagina} n.º {key}",
         "rep_mas": "+{n} más",
+        "rep_arballon": "Arballon (todos)",
+        "rep_arballon_vacio": "La tabla Arballon todavía no se cargó desde Supabase. Revisá la conexión a internet.",
+        "rep_col_arballon": "Arballon",
+        "rep_col_equipos": "Equipos",
         "buscar": "🔍 Filtrar:",
         "placeholder_buscar": "Ej: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Ocultar partes en 0",
         "ver_alertas": "Ver solo alertas (≥ 90%) ordenadas de mayor a menor",
         "info_pendiente": "Modelo activo: Pendiente de carga  |  Serie: Sin datos  |  Contador Total (TC): Sin datos  |  Fecha: Sin datos",
         "listo": "Listo. (Doble clic: copiar código | Clic derecho: editar Vida Útil y Cantidad)",
-        "modelo_manual": "Modelo:",
-        "vincular_pdf": "📕 Vincular Manual Servicio PDF",
-        "vincular_csv": "📄 Vincular CSV Cantidades",
-        "cruzar_csv_pdf": "⚡ Cruzar CSV + PDF",
-        "sin_pdf": "PDF: Sin vincular",
-        "sin_csv": "CSV: Sin vincular",
-        "abrir_pdf": "🔗 Abrir PDF",
-        "buscar_error_lbl": "🔎 Buscar Código de Error / Parte en Manual:",
-        "placeholder_error": "Ej: C-2557, C-3801, Jam, Fusing Belt...",
-        "btn_buscar_manual": "Buscar en el Manual",
         "col_no": "No",
         "col_arballon": "Código Arballon",
         "col_cant": "Cant.",
@@ -1035,6 +918,16 @@ const TRADUCCIONES = {
         "col_partno": "Parts No",
         "col_count": "Count (A4)",
         "col_vida": "Vida Útil",
+        "col_fuente": "Fuente",
+        "fuente_manual": "Manual",
+        "fuente_editado": "Editado",
+        "edit_vida_placeholder": "Vacío = usar el valor del manual",
+        "vida_coincide": "✅ Coincide con {fuente}",
+        "vida_dipsw_fabrica": "Según {sw} = {v} (valor de fábrica: no figura en el historial de DIPSW)",
+        "vida_dipsw_historial": "Según {sw} = {v} (historial de DIPSW del List Output)",
+        "vida_alternativas": "Otros valores del manual:",
+        "vida_sensor": "ⓘ El manual indica que el reemplazo lo determina el sensor (detección de lleno), no el contador.",
+        "vida_ver_manual": "Clic en la fuente: ver la parte en la pestaña Mantenimiento.",
         "col_pct": "% Desgaste",
         "col_reset": "ResetCount",
         "col_estado": "Estado",
@@ -1042,10 +935,7 @@ const TRADUCCIONES = {
         "lbl_serie": "Serie",
         "lbl_contador": "Contador Total",
         "lbl_fecha": "Fecha",
-        "modal_procesando_txt": "Cruzando List Output, CSV y Manual PDF...",
-        "modal_cargando_excel": "Cargando Base Excel...",
-        "modal_buscando_pdf": "Buscando en el Manual PDF...",
-        "modal_extrayendo_pdf": "Cruzando CSV con Manual de Servicio PDF...",
+        "modal_procesando_txt": "Cruzando List Output con Arballon y el manual de servicio...",
         "modal_supabase": "Conectando con Supabase (tabla Arballon)...",
         "supabase_ok": "Supabase · arballon",
         "supabase_offline": "Supabase sin conexión · copia guardada",
@@ -1054,10 +944,6 @@ const TRADUCCIONES = {
     "en": {
         "titulo_ventana": "Konica Minolta Technical Station - Windows 11 Edition",
         "opciones": "⚙️ Options",
-        "agregar_modelo": "➕ Add Model",
-        "base_excel": "🔄 Excel Database (Arballon/Yields)",
-        "vincular_csv_menu": "📄 Link Quantities CSV (Active Model)",
-        "extraer_vidas_pdf": "⚡ Cross CSV + PDF Manual (Auto-fill)",
         "exportar_excel": "📊 Export Excel",
         "idioma_ingles": "🇬🇧 English",
         "idioma_espanol": "🇪🇸 Spanish",
@@ -1071,7 +957,6 @@ const TRADUCCIONES = {
         "instalar_archivo": "The app is open as a local file, and it can't be installed that way.\n\nOpen it from https://kmtechstation.netlify.app in Chrome or Edge and click \"Install app\" again.",
         "entendido": "Got it",
         "analisis_txt": "📊 List Output Analysis",
-        "manual_pdf": "📘 PDF Manuals & CSV per Model",
         "codigos_error": "🚨 Error codes",
         "cod_modelo": "Machine:",
         "cod_todos": "All",
@@ -1130,7 +1015,7 @@ const TRADUCCIONES = {
         "rep_tab": "🔩 Parts",
         "rep_modelo": "Machine:",
         "rep_clase": "Class:",
-        "rep_placeholder": "Search: Parts No., name, page, PMN...",
+        "rep_placeholder": "Search: Arballon, Parts No., name, page...",
         "rep_cargando": "Loading the parts catalog from Supabase...",
         "rep_sin_conexion": "Could not load the parts catalog from Supabase. Check your internet connection and open the tab again.",
         "rep_sin_filas": "No parts match these filters.",
@@ -1147,22 +1032,16 @@ const TRADUCCIONES = {
         "rep_col_pmn": "PMN No.",
         "rep_en_catalogo": "Catalog: {nombre} · p. {pagina} key {key}",
         "rep_mas": "+{n} more",
+        "rep_arballon": "Arballon (all)",
+        "rep_arballon_vacio": "The Arballon table has not been loaded from Supabase yet. Check your internet connection.",
+        "rep_col_arballon": "Arballon",
+        "rep_col_equipos": "Machines",
         "buscar": "🔍 Filter:",
         "placeholder_buscar": "Ex: Arballon, Drum, Fusing, A5AW7217...",
         "ocultar_ceros": "Hide zero parts",
         "ver_alertas": "Show alerts only (≥ 90%) sorted descending",
         "info_pendiente": "Active model: Pending load  |  Serial: No data  |  Total Counter (TC): No data  |  Date: No data",
         "listo": "Ready. (Double-click: copy code | Right-click: edit Yield & Qty)",
-        "modelo_manual": "Model:",
-        "vincular_pdf": "📕 Link Service Manual PDF",
-        "vincular_csv": "📄 Link Quantities CSV",
-        "cruzar_csv_pdf": "⚡ Cross CSV + PDF",
-        "sin_pdf": "PDF: Not linked",
-        "sin_csv": "CSV: Not linked",
-        "abrir_pdf": "🔗 Open PDF",
-        "buscar_error_lbl": "🔎 Search Error Code / Part in Manual:",
-        "placeholder_error": "Ex: C-2557, C-3801, Jam, Fusing Belt...",
-        "btn_buscar_manual": "Search in Manual",
         "col_no": "No",
         "col_arballon": "Arballon Code",
         "col_cant": "Qty",
@@ -1170,6 +1049,16 @@ const TRADUCCIONES = {
         "col_partno": "Parts No",
         "col_count": "Count (A4)",
         "col_vida": "Yield",
+        "col_fuente": "Source",
+        "fuente_manual": "Manual",
+        "fuente_editado": "Edited",
+        "edit_vida_placeholder": "Empty = use the manual value",
+        "vida_coincide": "✅ Matches {fuente}",
+        "vida_dipsw_fabrica": "Per {sw} = {v} (factory value: not in the DIPSW history)",
+        "vida_dipsw_historial": "Per {sw} = {v} (List Output DIPSW history)",
+        "vida_alternativas": "Other values in the manual:",
+        "vida_sensor": "ⓘ The manual states that replacement is determined by the sensor (full detection), not the counter.",
+        "vida_ver_manual": "Click the source: view the part in the Maintenance tab.",
         "col_pct": "% Wear",
         "col_reset": "ResetCount",
         "col_estado": "Status",
@@ -1177,10 +1066,7 @@ const TRADUCCIONES = {
         "lbl_serie": "Serial",
         "lbl_contador": "Total Counter",
         "lbl_fecha": "Date",
-        "modal_procesando_txt": "Crossing List Output, CSV & PDF Manual...",
-        "modal_cargando_excel": "Loading Excel Database...",
-        "modal_buscando_pdf": "Searching in PDF Manual...",
-        "modal_extrayendo_pdf": "Crossing CSV with PDF Service Manual...",
+        "modal_procesando_txt": "Crossing List Output with Arballon and the service manual...",
         "modal_supabase": "Connecting to Supabase (Arballon table)...",
         "supabase_ok": "Supabase · arballon",
         "supabase_offline": "Supabase offline · saved copy",
@@ -1198,7 +1084,7 @@ const SUPABASE_PAGINA = 1000; // Supabase devuelve como máximo 1000 filas por p
 
 // ================= ESTADO DE LA APLICACIÓN =================
 let configApp = cargarConfig();
-let vidasFallback = cargarVidasJson();
+let edicionesUsuario = cargarEdiciones();
 let idiomaActual = configApp.idioma || "es";
 let modeloActivoActual = MODELOS_INICIALES[0];
 
@@ -1206,26 +1092,20 @@ let dfResultado = [];
 let dfReferencia = cargarExcelCacheLocal();
 let nombreExcelActual = localStorage.getItem("km_excel_nombre") || "";
 let metadataEquipo = {};
+let dipswEquipo = {};
 let contenidoTxtActual = "";
 
 let ordenColumnaActual = null;
 let ordenReverso = false;
 
-// Memoria de PDFs y CSVs cargados en sesión / localStorage
-let pdfBlobsPorModelo = {};
-let pdfTextoPaginasPorModelo = {};
-let csvDatosPorModelo = cargarCsvCacheLocal();
 let filaEditandoActual = null;
 
 // ================= PERSISTENCIA LOCALSTORAGE =================
 function cargarConfig() {
-    const def = { modelos: [...MODELOS_INICIALES], idioma: "es", nombres_pdf: {}, nombres_csv: {} };
+    const def = { idioma: "es" };
     try {
         const guardado = JSON.parse(localStorage.getItem("km_config_app"));
-        if (guardado) {
-            MODELOS_INICIALES.forEach(m => { if (!guardado.modelos.includes(m)) guardado.modelos.push(m); });
-            return { ...def, ...guardado };
-        }
+        if (guardado) return { ...def, idioma: guardado.idioma || def.idioma };
     } catch (e) {}
     return def;
 }
@@ -1234,19 +1114,20 @@ function guardarConfig() {
     localStorage.setItem("km_config_app", JSON.stringify(configApp));
 }
 
-function cargarVidasJson() {
+// Vida útil y cantidad cargadas a mano (clic derecho), por equipo y nombre de parte:
+// { "C14000": { "waste toner box": { vida: 540000, cantidad: 1 } } }. Tienen prioridad sobre el manual.
+function cargarEdiciones() {
     try {
-        const guardado = JSON.parse(localStorage.getItem("km_vidas_utiles"));
-        if (guardado) {
-            if (!guardado._cantidades) guardado._cantidades = {};
-            return guardado;
-        }
-    } catch (e) {}
-    return { _cantidades: {} };
+        return JSON.parse(localStorage.getItem("km_ediciones")) || {};
+    } catch (e) { return {}; }
 }
 
-function guardarVidasJson() {
-    localStorage.setItem("km_vidas_utiles", JSON.stringify(vidasFallback));
+function guardarEdiciones() {
+    try { localStorage.setItem("km_ediciones", JSON.stringify(edicionesUsuario)); } catch (e) {}
+}
+
+function edicionDeParte(modelo, nombreParte) {
+    return (edicionesUsuario[modelo] || {})[String(nombreParte).trim().toLowerCase()] || null;
 }
 
 function cargarExcelCacheLocal() {
@@ -1254,13 +1135,6 @@ function cargarExcelCacheLocal() {
         const guardado = localStorage.getItem("km_excel_data");
         return guardado ? JSON.parse(guardado) : [];
     } catch (e) { return []; }
-}
-
-function cargarCsvCacheLocal() {
-    try {
-        const guardado = localStorage.getItem("km_csv_data");
-        return guardado ? JSON.parse(guardado) : {};
-    } catch (e) { return {}; }
 }
 
 function t(clave) {
@@ -1316,119 +1190,34 @@ function expandirCodigosTxt(textoPartsNo) {
 }
 
 // ================= CÁLCULO DE CANTIDADES Y CRUCE DE DATOS =================
-function obtenerMapaCsvModelo(modelo) {
-    const mapaCodCant = {};
-    const mapaNomCant = {};
-    const mapaCodVida = {};
-
-    const filasCsv = csvDatosPorModelo[modelo] || [];
-    if (!filasCsv.length) return { mapaCodCant, mapaNomCant, mapaCodVida };
-
-    const cols = Object.keys(filasCsv[0] || {});
-    let colPartNo = null, colName = null, colQty = null, colYield = null, colModelo = null;
-
-    for (const cOrig of cols) {
-        const cLow = cOrig.trim().toLowerCase();
-        if (["part no", "parts no", "part_no", "codigo", "código", "partno", "number", "p/n", "item"].some(w => cLow.includes(w))) {
-            if (!cLow.includes("arballon")) colPartNo = cOrig;
-        } else if (["name", "nombre", "descrip", "description", "parte"].some(w => cLow.includes(w))) {
-            colName = cOrig;
-        } else if (["qty", "q'ty", "cant", "quantity", "unidades"].some(w => cLow.includes(w))) {
-            colQty = cOrig;
-        } else if (["vida", "yield", "life", "duracion", "duración", "rendimiento"].some(w => cLow.includes(w))) {
-            colYield = cOrig;
-        } else if (["model", "modelo", "equipo"].some(w => cLow.includes(w))) {
-            colModelo = cOrig;
-        }
-    }
-
-    if (!colPartNo && cols.length >= 2) colPartNo = cols[0];
-    if (!colQty && cols.length >= 2) colQty = cols[cols.length - 1];
-
-    if (!vidasFallback._cantidades[modelo]) vidasFallback._cantidades[modelo] = {};
-    if (!vidasFallback[modelo]) vidasFallback[modelo] = {};
-
-    for (const fila of filasCsv) {
-        if (colModelo && fila[colModelo]) {
-            const modFila = String(fila[colModelo]).trim().toUpperCase();
-            if (modFila && !modFila.includes(modelo.toUpperCase()) && !modelo.toUpperCase().includes(modFila)) continue;
-        }
-
-        let valCant = null;
-        if (colQty && fila[colQty] !== undefined) {
-            const limpioC = String(fila[colQty]).split(".")[0].replace(/[^\d]/g, "");
-            if (limpioC && parseInt(limpioC) >= 1 && parseInt(limpioC) <= 99) valCant = parseInt(limpioC);
-        }
-
-        let valVida = null;
-        if (colYield && fila[colYield] !== undefined) {
-            const limpioV = String(fila[colYield]).split(".")[0].replace(/[^\d]/g, "");
-            if (limpioV && parseInt(limpioV) >= 1000) valVida = parseInt(limpioV);
-        }
-
-        if (colPartNo && fila[colPartNo]) {
-            const clavesCod = expandirCodigosTxt(fila[colPartNo]);
-            for (const cl of clavesCod) {
-                if (valCant) {
-                    mapaCodCant[cl] = valCant;
-                    vidasFallback._cantidades[modelo][cl] = valCant;
-                }
-                if (valVida) {
-                    mapaCodVida[cl] = valVida;
-                    vidasFallback[modelo][cl] = valVida;
-                }
-            }
-        }
-
-        if (colName && fila[colName]) {
-            const nomL = String(fila[colName]).trim().toLowerCase();
-            if (nomL && nomL !== "nan") {
-                if (valCant) {
-                    mapaNomCant[nomL] = valCant;
-                    vidasFallback._cantidades[modelo][nomL] = valCant;
-                }
-                if (valVida) vidasFallback[modelo][nomL] = valVida;
-            }
-        }
-    }
-    guardarVidasJson();
-    return { mapaCodCant, mapaNomCant, mapaCodVida };
+// Tabla Arballon (Supabase): número de parte / nombre -> código Arballon.
+// Se recalcula solo cuando cambia la tabla (dfReferencia).
+let cacheArballon = { ref: null, mapas: null };
+function mapasArballon() {
+    if (cacheArballon.ref !== dfReferencia) cacheArballon = { ref: dfReferencia, mapas: obtenerMapasArballon() };
+    return cacheArballon.mapas;
 }
 
-function obtenerMapasExcel(modeloActual) {
-    const mapaParteArb = {}, mapaNombreArb = {};
-    const mapaParteVida = {}, mapaNombreVida = {};
-    const mapaParteCant = {}, mapaNombreCant = {};
-
-    if (!dfReferencia || !dfReferencia.length) {
-        return { mapaParteArb, mapaNombreArb, mapaParteVida, mapaNombreVida, mapaParteCant, mapaNombreCant };
+function codigosArballonDe(partsNo) {
+    const { mapaParteArb } = mapasArballon();
+    const codigos = [];
+    for (const c of extraerBasesExcel(partsNo)) {
+        for (const a of mapaParteArb[c] || []) if (!codigos.includes(a)) codigos.push(a);
     }
+    return codigos;
+}
+
+function obtenerMapasArballon() {
+    const mapaParteArb = {}, mapaNombreArb = {};
+    if (!dfReferencia || !dfReferencia.length) return { mapaParteArb, mapaNombreArb };
 
     const cols = Object.keys(dfReferencia[0] || {});
-    let colNombreRef = null, colCodigoRef = null, colParteRef = null, colVidaModelo = null, colCantRef = null;
-    const modeloLow = modeloActual.toLowerCase();
-    const modeloBaseLow = modeloLow.replace(/[a-z]+$/, "");
-
+    let colNombreRef = null, colCodigoRef = null, colParteRef = null;
     for (const cOrig of cols) {
         const cLow = cOrig.trim().toLowerCase();
         if (cLow.includes("arballon")) colCodigoRef = cOrig;
         else if (cLow.includes("part") && cLow.includes("name")) colNombreRef = cOrig;
         else if (cLow.includes("part") && (cLow.includes("no") || cLow.includes("num") || cLow.includes("cod"))) colParteRef = cOrig;
-        else if (["cant", "qty", "q'ty", "unidades"].some(w => cLow.includes(w))) colCantRef = cOrig;
-
-        if (cLow.includes(modeloLow) || (modeloBaseLow.length >= 4 && cLow.includes(modeloBaseLow))) {
-            colVidaModelo = cOrig;
-        }
-    }
-
-    if (!colVidaModelo) {
-        for (const cOrig of cols) {
-            const cLow = cOrig.trim().toLowerCase();
-            if (["vida", "yield", "life", "rendimiento"].some(w => cLow.includes(w))) {
-                colVidaModelo = cOrig;
-                break;
-            }
-        }
     }
 
     for (const filaRef of dfReferencia) {
@@ -1438,76 +1227,20 @@ function obtenerMapasExcel(modeloActual) {
             if (valArbStr.toLowerCase() === "nan") valArbStr = "";
             else if (valArbStr.endsWith(".0")) valArbStr = valArbStr.slice(0, -2);
         }
-
-        let valVida = null;
-        if (colVidaModelo && filaRef[colVidaModelo] !== undefined) {
-            const limpioNum = String(filaRef[colVidaModelo]).split(".")[0].replace(/[^\d]/g, "");
-            if (limpioNum && parseInt(limpioNum) > 0) valVida = parseInt(limpioNum);
-        }
-
-        let valCant = null;
-        if (colCantRef && filaRef[colCantRef] !== undefined) {
-            const limpioC = String(filaRef[colCantRef]).split(".")[0].replace(/[^\d]/g, "");
-            if (limpioC && parseInt(limpioC) >= 1 && parseInt(limpioC) <= 50) valCant = parseInt(limpioC);
-        }
+        if (!valArbStr) continue;
 
         if (colParteRef && filaRef[colParteRef]) {
-            const claves = extraerBasesExcel(filaRef[colParteRef]);
-            for (const cl of claves) {
-                if (valArbStr) {
-                    if (!mapaParteArb[cl]) mapaParteArb[cl] = [];
-                    if (!mapaParteArb[cl].includes(valArbStr)) mapaParteArb[cl].push(valArbStr);
-                }
-                if (valVida) mapaParteVida[cl] = valVida;
-                if (valCant) mapaParteCant[cl] = valCant;
+            for (const cl of extraerBasesExcel(filaRef[colParteRef])) {
+                if (!mapaParteArb[cl]) mapaParteArb[cl] = [];
+                if (!mapaParteArb[cl].includes(valArbStr)) mapaParteArb[cl].push(valArbStr);
             }
         }
-
         if (colNombreRef && filaRef[colNombreRef]) {
             const nomL = String(filaRef[colNombreRef]).trim().toLowerCase();
-            if (nomL && nomL !== "nan") {
-                if (valArbStr) mapaNombreArb[nomL] = valArbStr;
-                if (valVida) mapaNombreVida[nomL] = valVida;
-                if (valCant) mapaNombreCant[nomL] = valCant;
-            }
+            if (nomL && nomL !== "nan") mapaNombreArb[nomL] = valArbStr;
         }
     }
-
-    return { mapaParteArb, mapaNombreArb, mapaParteVida, mapaNombreVida, mapaParteCant, mapaNombreCant };
-}
-
-function calcularCantidadParte(modelo, nombreParte, codigosTxt, mapaCsvCod, mapaCsvNom, mapaParteCant, mapaNombreCant) {
-    const nomUpper = String(nombreParte).trim().toUpperCase();
-    const nomLower = nomUpper.toLowerCase();
-
-    if (mapaCsvCod) {
-        for (const cod of codigosTxt) if (mapaCsvCod[cod]) return parseInt(mapaCsvCod[cod]);
-    }
-    if (mapaCsvNom && mapaCsvNom[nomLower]) return parseInt(mapaCsvNom[nomLower]);
-
-    const cantJsonMod = (vidasFallback._cantidades || {})[modelo] || {};
-    for (const cod of codigosTxt) if (cantJsonMod[cod]) return parseInt(cantJsonMod[cod]);
-    if (cantJsonMod[nomLower]) return parseInt(cantJsonMod[nomLower]);
-
-    const cantModFab = CANTIDADES_EQUIPO_FABRICA[modelo] || {};
-    for (const cod of codigosTxt) if (cantModFab[cod]) return cantModFab[cod];
-    for (const [k, v] of Object.entries(cantModFab)) if (nomUpper.includes(k)) return v;
-
-    if (mapaParteCant) {
-        for (const cod of codigosTxt) if (mapaParteCant[cod]) return mapaParteCant[cod];
-    }
-    if (mapaNombreCant && mapaNombreCant[nomLower]) return mapaNombreCant[nomLower];
-
-    for (const cod of codigosTxt) {
-        if (CANTIDADES_GLOBALES_POR_CODIGO[cod]) return CANTIDADES_GLOBALES_POR_CODIGO[cod];
-        if (cod.length >= 8 && CANTIDADES_GLOBALES_POR_CODIGO[cod.slice(0, 8)]) return CANTIDADES_GLOBALES_POR_CODIGO[cod.slice(0, 8)];
-    }
-
-    for (const [kwGlobal, qtyGlobal] of Object.entries(CANTIDADES_GLOBALES_POR_NOMBRE)) {
-        if (nomUpper.includes(kwGlobal)) return qtyGlobal;
-    }
-
-    return 1;
+    return { mapaParteArb, mapaNombreArb };
 }
 
 // ================= PARSEO DE ARCHIVO .TXT KONICA MINOLTA =================
@@ -1536,7 +1269,7 @@ function parsearSpecialPartsPuro(contenido) {
     }
 
     const modeloUsar = modeloDetectado || modeloActivoActual;
-    if (modeloDetectado) sincronizarModeloDetectado(modeloDetectado);
+    if (modeloDetectado) modeloActivoActual = modeloDetectado;
 
     metadataEquipo = {
         Modelo: modeloUsar,
@@ -1591,64 +1324,39 @@ function parsearSpecialPartsPuro(contenido) {
         }
     }
 
+    dipswEquipo = parsearHistorialDipsw(contenido);
     dfResultado = cruzarArballonYVidaUtil(registros, modeloUsar);
+    vincularVidasManual(modeloUsar);
 }
 
-function cruzarArballonYVidaUtil(registros, modeloActual) {
-    const { mapaParteArb, mapaNombreArb, mapaParteVida, mapaNombreVida, mapaParteCant, mapaNombreCant } = obtenerMapasExcel(modeloActual);
-    const { mapaCodCant, mapaNomCant, mapaCodVida } = obtenerMapaCsvModelo(modeloActual);
+// Estado de cada DIPSW según el historial de cambios del List Output: { "39": "00000010" } (Bit7-Bit0).
+// Los DIPSW que no figuran en el historial se toman con su valor de fábrica (0).
+function parsearHistorialDipsw(contenido) {
+    const ultimos = {};
+    const reCambio = /^\s*\d{3}\s+(\d{4}\/\d{2}\/\d{2}\s+\d{2}:\d{2})\s+\S+\s+(\d{1,3})\s+((?:[01]\s+){7}[01])\s+((?:[01]\s+){7}[01])\s*$/;
+    for (const linea of contenido.split(/\r?\n/)) {
+        const m = linea.match(reCambio);
+        if (!m) continue;
+        const [, fecha, numero, , despues] = m;
+        const clave = String(parseInt(numero));
+        if (!ultimos[clave] || fecha > ultimos[clave].fecha) {
+            ultimos[clave] = { fecha, bits: despues.replace(/\s+/g, "") };
+        }
+    }
+    const estado = {};
+    for (const [clave, { bits }] of Object.entries(ultimos)) estado[clave] = bits;
+    return estado;
+}
 
-    const tablaOficialModelo = VIDAS_OFICIALES_FABRICA[modeloActual] || {};
-    const vidasJsonModelo = vidasFallback[modeloActual] || {};
+// Código Arballon de cada parte y, si existe, la vida útil / cantidad editadas a mano.
+// La vida útil del manual de servicio se agrega después (vincularVidasManual).
+function cruzarArballonYVidaUtil(registros, modeloActual) {
+    const { mapaParteArb, mapaNombreArb } = mapasArballon();
 
     for (const fila of registros) {
         const codigosHallados = [];
-        let vidaHallada = null;
-
         const codigosTxt = expandirCodigosTxt(fila["Parts No"]);
         const nomTxt = String(fila["Parts Name"]).trim().toLowerCase();
-        const nomUpper = nomTxt.toUpperCase();
-
-        for (const codT of codigosTxt) {
-            if (tablaOficialModelo[codT]) { vidaHallada = tablaOficialModelo[codT]; break; }
-        }
-
-        if (!vidaHallada) {
-            if (tablaOficialModelo[nomUpper]) {
-                vidaHallada = tablaOficialModelo[nomUpper];
-            } else {
-                for (const [kwOficial, valOficial] of Object.entries(tablaOficialModelo)) {
-                    if (kwOficial.length > 4 && nomUpper.includes(kwOficial)) {
-                        vidaHallada = valOficial;
-                        break;
-                    }
-                }
-            }
-        }
-
-        if (!vidaHallada) {
-            for (const codT of codigosTxt) {
-                if (mapaCodVida[codT]) { vidaHallada = mapaCodVida[codT]; break; }
-            }
-        }
-
-        if (!vidaHallada) {
-            for (const codT of codigosTxt) {
-                if (vidasJsonModelo[codT]) { vidaHallada = vidasJsonModelo[codT]; break; }
-                else if (codT.length >= 8 && vidasJsonModelo[codT.slice(0, 8)]) {
-                    vidaHallada = vidasJsonModelo[codT.slice(0, 8)];
-                    break;
-                }
-            }
-            if (!vidaHallada && vidasJsonModelo[nomTxt]) vidaHallada = vidasJsonModelo[nomTxt];
-        }
-
-        if (!vidaHallada) {
-            for (const codT of codigosTxt) {
-                if (mapaParteVida[codT]) { vidaHallada = mapaParteVida[codT]; break; }
-            }
-            if (!vidaHallada && mapaNombreVida[nomTxt]) vidaHallada = mapaNombreVida[nomTxt];
-        }
 
         for (const codT of codigosTxt) {
             if (mapaParteArb[codT]) {
@@ -1661,21 +1369,16 @@ function cruzarArballonYVidaUtil(registros, modeloActual) {
                 }
             }
         }
-
-        if (!codigosHallados.length && mapaNombreArb[nomTxt]) {
-            codigosHallados.push(mapaNombreArb[nomTxt]);
-        }
-
+        if (!codigosHallados.length && mapaNombreArb[nomTxt]) codigosHallados.push(mapaNombreArb[nomTxt]);
         fila["Código Arballon"] = codigosHallados.join(" / ");
-        fila["Cantidad"] = calcularCantidadParte(
-            modeloActual, fila["Parts Name"], codigosTxt,
-            mapaCodCant, mapaNomCant, mapaParteCant, mapaNombreCant
-        );
 
-        if (!fila["Es_Porcentaje_Nativo"] && vidaHallada && parseInt(vidaHallada) > 0) {
-            const vidaInt = parseInt(vidaHallada);
-            fila["Vida_Util"] = vidaInt;
-            fila["Porcentaje"] = Math.round((fila["Count"] / vidaInt) * 1000) / 10;
+        const edicion = edicionDeParte(modeloActual, fila["Parts Name"]);
+        fila["Cantidad"] = edicion && edicion.cantidad ? edicion.cantidad : 1;
+        fila["Cantidad_Editada"] = Boolean(edicion && edicion.cantidad);
+        if (!fila["Es_Porcentaje_Nativo"] && edicion && edicion.vida) {
+            fila["Vida_Util"] = edicion.vida;
+            fila["Porcentaje"] = Math.round((fila["Count"] / edicion.vida) * 1000) / 10;
+            fila["Fuente"] = "editado";
         }
     }
 
@@ -1685,7 +1388,9 @@ function cruzarArballonYVidaUtil(registros, modeloActual) {
 function evaluarEstados(registros) {
     for (const fila of registros) {
         const pct = fila["Porcentaje"];
-        if (pct !== null && pct !== undefined && !isNaN(pct)) {
+        if (fila["Reemplazo_Sensor"]) {
+            fila["Estado"] = "ⓘ SENSOR";
+        } else if (pct !== null && pct !== undefined && !isNaN(pct)) {
             if (pct >= 100) fila["Estado"] = "⚠️ EXCEDIDO (≥100%)";
             else if (pct >= 90) fila["Estado"] = "⚡ PRÓXIMO (≥90%)";
             else fila["Estado"] = "OK";
@@ -1703,10 +1408,6 @@ function actualizarTextosIdioma() {
     menu.innerHTML = "";
     const opciones = [
         { val: "opciones", txt: t("opciones") },
-        { val: "agregar_modelo", txt: t("agregar_modelo") },
-        { val: "base_excel", txt: t("base_excel") },
-        { val: "vincular_csv_menu", txt: t("vincular_csv_menu") },
-        { val: "extraer_vidas_pdf", txt: t("extraer_vidas_pdf") },
         { val: "exportar_excel", txt: t("exportar_excel") },
         { val: "en", txt: t("idioma_ingles") },
         { val: "es", txt: t("idioma_espanol") }
@@ -1721,7 +1422,6 @@ function actualizarTextosIdioma() {
 
     document.getElementById("btn-cargar-txt").textContent = t("cargar_txt");
     document.getElementById("btn-tab-partes").textContent = t("analisis_txt");
-    document.getElementById("btn-tab-manual").textContent = t("manual_pdf");
     document.getElementById("btn-tab-codigos").textContent = t("codigos_error");
     document.getElementById("btn-instalar-app").textContent = t("instalar_app");
 
@@ -1729,15 +1429,6 @@ function actualizarTextosIdioma() {
     document.getElementById("entrada-buscar").placeholder = t("placeholder_buscar");
     document.getElementById("txt-ocultar-ceros").textContent = t("ocultar_ceros");
     document.getElementById("txt-ver-alertas").textContent = t("ver_alertas");
-
-    document.getElementById("lbl-manual-mod").textContent = t("modelo_manual");
-    document.getElementById("btn-vincular-pdf").textContent = t("vincular_pdf");
-    document.getElementById("btn-vincular-csv").textContent = t("vincular_csv");
-    document.getElementById("btn-cruzar-ambos").textContent = t("cruzar_csv_pdf");
-    document.getElementById("btn-abrir-pdf").textContent = t("abrir_pdf");
-    document.getElementById("lbl-error-busq").textContent = t("buscar_error_lbl");
-    document.getElementById("entrada-error-pdf").placeholder = t("placeholder_error");
-    document.getElementById("btn-buscar-pdf").textContent = t("btn_buscar_manual");
 
     document.getElementById("lbl-cod-modelo").textContent = t("cod_modelo");
     document.getElementById("lbl-cod-buscar").textContent = t("cod_buscar");
@@ -1772,36 +1463,10 @@ function actualizarTextosIdioma() {
     renderizarRepuestos();
 
     const headers = document.querySelectorAll("#tabla-headers th");
-    const keysHeaders = ["col_no", "col_arballon", "col_cant", "col_name", "col_partno", "col_count", "col_vida", "col_pct", "col_reset", "col_estado"];
+    const keysHeaders = ["col_no", "col_arballon", "col_cant", "col_name", "col_partno", "col_count", "col_vida", "col_fuente", "col_pct", "col_reset", "col_estado"];
     headers.forEach((th, i) => { th.textContent = t(keysHeaders[i]); });
 
-    actualizarComboModelos();
     actualizarVista();
-    actualizarEstadoPdf();
-}
-
-function actualizarComboModelos() {
-    const combo = document.getElementById("combo-modelo-pdf");
-    const valPrev = combo.value || modeloActivoActual;
-    combo.innerHTML = "";
-    configApp.modelos.forEach(m => {
-        const opt = document.createElement("option");
-        opt.value = m;
-        opt.textContent = m;
-        combo.appendChild(opt);
-    });
-    combo.value = configApp.modelos.includes(valPrev) ? valPrev : configApp.modelos[0];
-}
-
-function sincronizarModeloDetectado(modeloDet) {
-    modeloActivoActual = modeloDet;
-    if (!configApp.modelos.includes(modeloDet)) {
-        configApp.modelos.push(modeloDet);
-        guardarConfig();
-        actualizarComboModelos();
-    }
-    document.getElementById("combo-modelo-pdf").value = modeloDet;
-    actualizarEstadoPdf();
 }
 
 function actualizarVista() {
@@ -1829,7 +1494,7 @@ function actualizarVista() {
     }
 
     if (document.getElementById("filtro-alertas").checked) {
-        mostrar = mostrar.filter(f => f.Porcentaje !== null && f.Porcentaje >= 90);
+        mostrar = mostrar.filter(f => f.Porcentaje !== null && f.Porcentaje >= 90 && !f.Reemplazo_Sensor);
         mostrar.sort((a, b) => (b.Porcentaje || 0) - (a.Porcentaje || 0));
     }
 
@@ -1845,10 +1510,13 @@ function actualizarVista() {
 
     const esIngles = idiomaActual === "en";
     const txtNativo = esIngles ? "Native %" : "Nativo %";
-    let conArb = 0;
+    let conArb = 0, conManual = 0, difieren = 0;
 
     mostrar.forEach((fila, idx) => {
         if (fila["Código Arballon"]) conArb++;
+        const difiere = fila["Fuente"] === "editado" && fila["Manual_Info"] && fila["Manual_Info"].vida !== fila["Vida_Util"];
+        if (fila["Fuente"] === "manual") conManual++;
+        if (difiere) difieren++;
 
         const tr = document.createElement("tr");
         if (fila.Estado.includes("EXCEDIDO")) tr.className = "excedido";
@@ -1870,6 +1538,11 @@ function actualizarVista() {
             ? fila.Estado.replace("EXCEDIDO", "EXCEEDED").replace("PRÓXIMO", "UPCOMING")
             : fila.Estado;
 
+        const detalle = fila.Es_Porcentaje_Nativo ? "" : detalleVida(fila);
+        let fuenteStr = fila.Es_Porcentaje_Nativo ? "-" : textoFuente(fila);
+        if (difiere) fuenteStr = `⚠️ ${fuenteStr}`;
+        else if (fila["Manual_Info"] && (fila["Manual_Info"].alternativas.length || fila["Manual_Info"].dipsw.length)) fuenteStr = `ⓘ ${fuenteStr}`;
+
         const celdas = [
             { txt: fila["No"], cls: "align-c" },
             { txt: fila["Código Arballon"], cls: "align-c" },
@@ -1877,16 +1550,23 @@ function actualizarVista() {
             { txt: fila["Parts Name"], cls: "align-l" },
             { txt: fila["Parts No"], cls: "align-c" },
             { txt: countStr, cls: "align-r" },
-            { txt: vidaStr, cls: "align-r" },
+            { txt: vidaStr, cls: "align-r", title: detalle },
+            { txt: fuenteStr, cls: "align-c", title: detalle, manual: Boolean(fila["Manual_Info"]) },
             { txt: pctStr, cls: "align-r" },
             { txt: fila["ResetCount"], cls: "align-c" },
-            { txt: estadoMostrar, cls: "align-c" }
+            { txt: estadoMostrar, cls: "align-c", title: fila["Reemplazo_Sensor"] ? t("vida_sensor") : "" }
         ];
 
         celdas.forEach(c => {
             const td = document.createElement("td");
             td.className = c.cls;
             td.textContent = c.txt;
+            if (c.title) td.title = c.title;
+            if (c.manual) {
+                td.style.cursor = "pointer";
+                td.style.textDecoration = "underline dotted";
+                td.addEventListener("click", () => verParteEnManual(fila));
+            }
             tr.appendChild(td);
         });
 
@@ -1910,10 +1590,15 @@ function actualizarVista() {
 
     const lblEst = document.getElementById("lbl-estado");
     lblEst.style.color = "var(--texto-gris)";
-    const infoExcel = nombreExcelActual ? ` | Base Excel: ${nombreExcelActual}` : "";
+    const infoExcel = nombreExcelActual ? ` | Arballon: ${nombreExcelActual}` : "";
+    const infoManual = conManual
+        ? (!esIngles
+            ? ` | ${conManual} con vida del manual${difieren ? ` (⚠️ ${difieren} editadas difieren del manual)` : ""}`
+            : ` | ${conManual} with service manual yield${difieren ? ` (⚠️ ${difieren} edited differ from the manual)` : ""}`)
+        : "";
     lblEst.textContent = !esIngles
-        ? `Mostrando ${mostrar.length} registros (${conArb} con Código Arballon)${infoExcel}  |  Doble clic: copiar código  |  Clic derecho: editar Vida Útil y Cantidad.`
-        : `Showing ${mostrar.length} records (${conArb} with Arballon Code)${infoExcel}  |  Double-click: copy code  |  Right-click: edit Yield & Qty.`;
+        ? `Mostrando ${mostrar.length} registros (${conArb} con Código Arballon)${infoManual}${infoExcel}  |  Doble clic: copiar código  |  Clic derecho: editar Vida Útil y Cantidad.`
+        : `Showing ${mostrar.length} records (${conArb} with Arballon Code)${infoManual}${infoExcel}  |  Double-click: copy code  |  Right-click: edit Yield & Qty.`;
 }
 
 // ================= EDICIÓN MANUAL (CLIC DERECHO) =================
@@ -1921,6 +1606,7 @@ function abrirModalEdicion(fila) {
     filaEditandoActual = fila;
     document.getElementById("edit-titulo-parte").textContent = `${fila["Parts Name"]} (${fila["Parts No"]}) - Modelo ${modeloActivoActual}`;
     document.getElementById("ent-vida").value = fila.Vida_Util ? fila.Vida_Util : "";
+    document.getElementById("ent-vida").placeholder = t("edit_vida_placeholder");
     document.getElementById("ent-cant").value = fila.Cantidad || 1;
     document.getElementById("modal-edicion").classList.add("active");
 }
@@ -1937,31 +1623,21 @@ document.getElementById("btn-guardar-edicion").addEventListener("click", () => {
     const nuevaVida = txtV && parseInt(txtV) > 0 ? parseInt(txtV) : null;
     const nuevaCant = txtC && parseInt(txtC) > 0 ? parseInt(txtC) : 1;
 
-    if (!vidasFallback[modeloActivoActual]) vidasFallback[modeloActivoActual] = {};
-    if (!vidasFallback._cantidades[modeloActivoActual]) vidasFallback._cantidades[modeloActivoActual] = {};
+    const fila = filaEditandoActual;
+    const nombre = String(fila["Parts Name"]).trim().toLowerCase();
+    const delModelo = edicionesUsuario[modeloActivoActual] || (edicionesUsuario[modeloActivoActual] = {});
+    const edicion = { ...(delModelo[nombre] || {}) };
 
-    const codigosExp = expandirCodigosTxt(filaEditandoActual["Parts No"]);
-    for (const cod of codigosExp) {
-        if (nuevaVida) vidasFallback[modeloActivoActual][cod] = nuevaVida;
-        vidasFallback._cantidades[modeloActivoActual][cod] = nuevaCant;
-    }
+    // Solo se guarda lo que se cambió; dejar la vida útil vacía vuelve al valor del manual
+    if (!nuevaVida) delete edicion.vida;
+    else if (fila.Fuente === "editado" || nuevaVida !== fila.Vida_Util) edicion.vida = nuevaVida;
+    if (fila.Cantidad_Editada || nuevaCant !== fila.Cantidad) edicion.cantidad = nuevaCant;
 
-    const nomKey = filaEditandoActual["Parts Name"].toLowerCase();
-    if (nuevaVida) vidasFallback[modeloActivoActual][nomKey] = nuevaVida;
-    vidasFallback._cantidades[modeloActivoActual][nomKey] = nuevaCant;
-    guardarVidasJson();
+    if (Object.keys(edicion).length) delModelo[nombre] = edicion;
+    else delete delModelo[nombre];
+    guardarEdiciones();
 
-    dfResultado.forEach(r => {
-        if (r.No === filaEditandoActual.No) {
-            r.Cantidad = nuevaCant;
-            if (nuevaVida && !r.Es_Porcentaje_Nativo) {
-                r.Vida_Util = nuevaVida;
-                r.Porcentaje = Math.round((r.Count / nuevaVida) * 1000) / 10;
-            }
-        }
-    });
-
-    evaluarEstados(dfResultado);
+    parsearSpecialPartsPuro(contenidoTxtActual);
     actualizarVista();
     document.getElementById("modal-edicion").classList.remove("active");
 });
@@ -1974,7 +1650,7 @@ function exportarExcel() {
     const esIngles = idiomaActual === "en";
 
     const alertas = dfResultado
-        .filter(r => r.Porcentaje !== null && r.Porcentaje >= 90)
+        .filter(r => r.Porcentaje !== null && r.Porcentaje >= 90 && !r.Reemplazo_Sensor)
         .sort((a, b) => (b.Porcentaje || 0) - (a.Porcentaje || 0));
 
     // 1. Resumen Pedido (7 columnas exactas)
@@ -1997,6 +1673,8 @@ function exportarExcel() {
         "Es_Porcentaje_Nativo": r["Es_Porcentaje_Nativo"],
         "Count": r["Count"],
         "Vida_Util": r["Vida_Util"] || "",
+        "Fuente": r["Fuente"] ? t(`fuente_${r["Fuente"]}`) : "",
+        "Vida_Manual": r["Manual_Info"] ? r["Manual_Info"].vida : "",
         "Porcentaje": r["Porcentaje"] !== null ? `${r["Porcentaje"].toFixed(1)}%` : "-",
         "PrevCount": r["PrevCount"],
         "ResetCount": r["ResetCount"],
@@ -2082,7 +1760,7 @@ function exportarExcel() {
     XLSX.writeFile(wb, `Reporte_${modeloActivoActual}_${serieLimpia}.xlsx`);
 }
 
-// ================= FUNCIONES DE PROGRESO Y PDF =================
+// ================= FUNCIONES DE PROGRESO =================
 function mostrarProgreso(titulo, pct) {
     const modal = document.getElementById("modal-progreso");
     document.getElementById("lbl-titulo-modal").textContent = titulo;
@@ -2095,36 +1773,8 @@ function ocultarProgreso() {
     document.getElementById("modal-progreso").classList.remove("active");
 }
 
-function actualizarEstadoPdf() {
-    const mod = document.getElementById("combo-modelo-pdf").value;
-    const nomPdf = (configApp.nombres_pdf || {})[mod];
-    const nomCsv = (configApp.nombres_csv || {})[mod];
-
-    const txtPdf = nomPdf ? `PDF: ${nomPdf}` : t("sin_pdf");
-    const txtCsv = nomCsv ? `CSV: ${nomCsv}` : t("sin_csv");
-
-    const lbl = document.getElementById("lbl-pdf-actual");
-    lbl.textContent = `${txtPdf}  |  ${txtCsv}`;
-    lbl.style.color = (nomPdf && nomCsv) ? "#6EE7B7" : "var(--texto-gris)";
-}
-
-async function extraerPaginasPdf(file, mod) {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const paginas = [];
-    for (let i = 1; i <= pdf.numPages; i++) {
-        if (i % 15 === 0) mostrarProgreso(t("modal_buscando_pdf"), i / pdf.numPages);
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const text = textContent.items.map(item => item.str).join("\n");
-        paginas.push(text);
-    }
-    pdfTextoPaginasPorModelo[mod] = paginas;
-    return paginas;
-}
-
 // ================= EVENTOS DE CONTROLES =================
-const PESTANAS = ["partes", "manual", "codigos", "mant", "docs", "rep"];
+const PESTANAS = ["partes", "codigos", "mant", "docs", "rep"];
 
 function mostrarPestana(nombre) {
     PESTANAS.forEach(p => {
@@ -2208,201 +1858,11 @@ document.getElementById("file-txt").addEventListener("change", (e) => {
     e.target.value = "";
 });
 
-document.getElementById("file-excel").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    mostrarProgreso(t("modal_cargando_excel"), 0.4);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        const data = new Uint8Array(ev.target.result);
-        const workbook = XLSX.read(data, { type: "array" });
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        dfReferencia = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
-        nombreExcelActual = file.name;
-        try {
-            localStorage.setItem("km_excel_data", JSON.stringify(dfReferencia));
-            localStorage.setItem("km_excel_nombre", nombreExcelActual);
-        } catch (err) {}
-
-        if (contenidoTxtActual) parsearSpecialPartsPuro(contenidoTxtActual);
-        actualizarVista();
-        ocultarProgreso();
-        alert(`Base Excel '${file.name}' cargada correctamente (${dfReferencia.length} filas).`);
-    };
-    reader.readAsArrayBuffer(file);
-    e.target.value = "";
-});
-
-document.getElementById("btn-vincular-csv").addEventListener("click", () => {
-    document.getElementById("file-csv").click();
-});
-
-document.getElementById("file-csv").addEventListener("change", (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const mod = document.getElementById("combo-modelo-pdf").value;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-        const wb = XLSX.read(ev.target.result, { type: "string" });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        csvDatosPorModelo[mod] = XLSX.utils.sheet_to_json(ws, { defval: "" });
-        configApp.nombres_csv = configApp.nombres_csv || {};
-        configApp.nombres_csv[mod] = file.name;
-        guardarConfig();
-        try { localStorage.setItem("km_csv_data", JSON.stringify(csvDatosPorModelo)); } catch (err) {}
-
-        obtenerMapaCsvModelo(mod);
-        actualizarEstadoPdf();
-        if (contenidoTxtActual && modeloActivoActual === mod) {
-            parsearSpecialPartsPuro(contenidoTxtActual);
-            actualizarVista();
-        }
-        alert(`CSV '${file.name}' vinculado al modelo ${mod}.`);
-    };
-    reader.readAsText(file);
-    e.target.value = "";
-});
-
-document.getElementById("btn-vincular-pdf").addEventListener("click", () => {
-    document.getElementById("file-pdf").click();
-});
-
-document.getElementById("file-pdf").addEventListener("change", async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const mod = document.getElementById("combo-modelo-pdf").value;
-    pdfBlobsPorModelo[mod] = file;
-    configApp.nombres_pdf = configApp.nombres_pdf || {};
-    configApp.nombres_pdf[mod] = file.name;
-    guardarConfig();
-    actualizarEstadoPdf();
-    mostrarProgreso(t("modal_buscando_pdf"), 0.1);
-    await extraerPaginasPdf(file, mod);
-    ocultarProgreso();
-    alert(`Manual PDF '${file.name}' cargado para el modelo ${mod}.`);
-    e.target.value = "";
-});
-
-document.getElementById("btn-abrir-pdf").addEventListener("click", () => {
-    const mod = document.getElementById("combo-modelo-pdf").value;
-    const file = pdfBlobsPorModelo[mod];
-    if (file) {
-        const url = URL.createObjectURL(file);
-        window.open(url, "_blank");
-    } else {
-        alert(`Primero selecciona el archivo PDF del modelo ${mod}.`);
-    }
-});
-
-document.getElementById("btn-buscar-pdf").addEventListener("click", buscarEnManualPdf);
-document.getElementById("entrada-error-pdf").addEventListener("keydown", (e) => {
-    if (e.key === "Enter") buscarEnManualPdf();
-});
-
-function buscarEnManualPdf() {
-    const mod = document.getElementById("combo-modelo-pdf").value;
-    const paginas = pdfTextoPaginasPorModelo[mod];
-    if (!paginas) {
-        alert(`Primero vincula el archivo PDF del modelo ${mod} en esta sesión.`);
-        return;
-    }
-    const termino = document.getElementById("entrada-error-pdf").value.trim();
-    if (!termino) return;
-
-    const termLow = termino.toLowerCase();
-    const bloques = [];
-    let hallazgos = 0;
-
-    paginas.forEach((txtPag, idxPag) => {
-        if (hallazgos >= 25) return;
-        if (txtPag.toLowerCase().includes(termLow)) {
-            hallazgos++;
-            const lineas = txtPag.split(/\r?\n/);
-            const extracto = [];
-            for (let i = 0; i < lineas.length; i++) {
-                if (lineas[i].toLowerCase().includes(termLow)) {
-                    const ini = Math.max(0, i - 2);
-                    const fin = Math.min(lineas.length, i + 5);
-                    extracto.push(lineas.slice(ini, fin).join("\n    "));
-                    if (extracto.length >= 2) break;
-                }
-            }
-            bloques.push(`Página ${idxPag + 1} del PDF:\n    ${extracto.join("\n    ---\n    ")}\n${"-".repeat(60)}\n\n`);
-        }
-    });
-
-    const salida = document.getElementById("txt-resultados-pdf");
-    salida.textContent = `Resultados para '${termino}' en el manual de ${mod}:\n${"=".repeat(60)}\n\n` +
-        (bloques.length ? bloques.join("") : `No se encontraron coincidencias para '${termino}'.`);
-}
-
-function cruzarCsvYPdfManual() {
-    const mod = document.getElementById("combo-modelo-pdf").value;
-    const paginas = pdfTextoPaginasPorModelo[mod];
-    if (!paginas) {
-        alert(`Primero vincula el Manual de Servicio PDF para el modelo ${mod}.`);
-        return;
-    }
-
-    mostrarProgreso(t("modal_extrayendo_pdf"), 0.5);
-    const { mapaCodCant } = obtenerMapaCsvModelo(mod);
-    let nuevos = 0;
-
-    if (!vidasFallback[mod]) vidasFallback[mod] = {};
-    const codigosBuscar = new Set(Object.keys(mapaCodCant));
-    dfResultado.forEach(r => expandirCodigosTxt(r["Parts No"]).forEach(c => { if (c.length >= 7) codigosBuscar.add(c); }));
-
-    paginas.forEach(txtPag => {
-        const txtUpper = txtPag.toUpperCase().replace(/-/g, "");
-        codigosBuscar.forEach(cod => {
-            if (txtUpper.includes(cod)) {
-                const partePosterior = txtUpper.split(cod)[1].slice(0, 250);
-                const matchMiles = partePosterior.match(/\b(\d{1,3}(?:[,.]\d{3})+)\b/);
-                if (matchMiles) {
-                    const val = parseInt(matchMiles[1].replace(/[^\d]/g, ""));
-                    if (val >= 10000 && val <= 15000000 && val % 500 === 0) {
-                        vidasFallback[mod][cod] = val;
-                        codigosBuscar.delete(cod);
-                        nuevos++;
-                    }
-                }
-            }
-        });
-    });
-
-    guardarVidasJson();
-    if (contenidoTxtActual) parsearSpecialPartsPuro(contenidoTxtActual);
-    actualizarVista();
-    ocultarProgreso();
-    alert(`Cruce completado para ${mod}:\n• Vidas útiles extraídas del PDF: ${nuevos}`);
-}
-
-document.getElementById("btn-cruzar-ambos").addEventListener("click", cruzarCsvYPdfManual);
-
 document.getElementById("menu-opciones").addEventListener("change", (e) => {
     const val = e.target.value;
     e.target.value = "opciones";
 
-    if (val === "agregar_modelo") {
-        const nuevo = prompt("Ingresá el nombre del nuevo modelo Konica Minolta (ej: C12000, C6100, C84hc):");
-        if (nuevo && nuevo.trim()) {
-            const modLimpio = nuevo.trim().toUpperCase();
-            if (!configApp.modelos.includes(modLimpio)) {
-                configApp.modelos.push(modLimpio);
-                guardarConfig();
-                actualizarComboModelos();
-            }
-            document.getElementById("combo-modelo-pdf").value = modLimpio;
-            actualizarEstadoPdf();
-        }
-    } else if (val === "base_excel") {
-        document.getElementById("file-excel").click();
-    } else if (val === "vincular_csv_menu") {
-        document.getElementById("combo-modelo-pdf").value = modeloActivoActual;
-        document.getElementById("file-csv").click();
-    } else if (val === "extraer_vidas_pdf") {
-        cruzarCsvYPdfManual();
-    } else if (val === "exportar_excel") {
+    if (val === "exportar_excel") {
         if (dfResultado.length) exportarExcel();
         else alert("Primero cargá un reporte TXT para poder exportar.");
     } else if (val === "en" || val === "es") {
@@ -2416,7 +1876,6 @@ document.getElementById("menu-opciones").addEventListener("change", (e) => {
 document.getElementById("entrada-buscar").addEventListener("input", actualizarVista);
 document.getElementById("filtro-ceros").addEventListener("change", actualizarVista);
 document.getElementById("filtro-alertas").addEventListener("change", actualizarVista);
-document.getElementById("combo-modelo-pdf").addEventListener("change", actualizarEstadoPdf);
 
 // Ordenamiento por columnas
 document.querySelectorAll("#tabla-headers th").forEach(th => {
@@ -2445,7 +1904,7 @@ document.querySelectorAll("#tabla-headers th").forEach(th => {
 // Si no hay conexión, se sigue usando la última copia guardada en el navegador.
 // ================= CÓDIGOS DE ERROR (MANUALES DE SERVICIO EN SUPABASE) =================
 const SUPABASE_TABLA_CODIGOS = "manual_codigos_error";
-const MODELOS_MANUALES = ["C14000", "AL400", "PRO1100", "AP2100", "6136"]; // equipos con manual cargado en Supabase
+const MODELOS_MANUALES = ["C14000", "AL400", "PRO1100", "AP2100", "6136", "7136"]; // equipos con manual cargado en Supabase
 const LIMITE_CODIGOS = 60;
 const CAMPOS_BUSQUEDA_CODIGOS = ["codigo", "clasificacion", "causa", "partes_sospechosas", "solucion"];
 const CAMPOS_TARJETA_CODIGO = [
@@ -2596,9 +2055,17 @@ const ACCIONES_MANT = ["Reemplazo", "Limpieza", "Lubricación", "Revisión"];
 const CLASE_ACCION = { "Reemplazo": "reemplazo", "Limpieza": "limpieza", "Lubricación": "lubricacion", "Revisión": "revision" };
 const COLUMNAS_MANT = ["mant_col_unidad", "mant_col_seccion", "mant_col_desc", "mant_col_parts", "mant_col_cant", "mant_col_intervalo", "mant_col_accion", "mant_col_obs"];
 const mantPorModelo = {}; // modelo -> filas | "cargando" | "error"
+const cargasMantenimiento = {}; // modelo -> promesa de la descarga en curso o terminada
 
-async function cargarMantenimiento(modelo) {
-    if (!modelo || Array.isArray(mantPorModelo[modelo]) || mantPorModelo[modelo] === "cargando") return;
+function cargarMantenimiento(modelo) {
+    if (!modelo) return Promise.resolve();
+    if (!cargasMantenimiento[modelo] || mantPorModelo[modelo] === "error") {
+        cargasMantenimiento[modelo] = descargarMantenimiento(modelo);
+    }
+    return cargasMantenimiento[modelo];
+}
+
+async function descargarMantenimiento(modelo) {
     mantPorModelo[modelo] = "cargando";
     renderizarMantenimiento();
     try {
@@ -2622,6 +2089,203 @@ async function cargarMantenimiento(modelo) {
         llenarFiltrosMantenimiento();
         renderizarMantenimiento();
     }
+}
+
+// ================= VIDA ÚTIL DESDE EL MANUAL DE SERVICIO (CRUCE CON EL LIST OUTPUT) =================
+// El manual tiene prioridad sobre las demás fuentes; si otra fuente da un valor distinto se avisa (double check).
+const indicesVidaManual = {}; // modelo -> { porCodigo: Map, porNombre: Map }
+
+// Equipo del List Output -> equipo con manual cargado (p. ej. "2100" -> "AP2100", "PRO1100" -> "PRO1100")
+function modeloConManual(modelo) {
+    if (!modelo) return null;
+    const mod = String(modelo).toUpperCase();
+    if (MODELOS_MANUALES.includes(mod)) return mod;
+    const digitos = s => s.replace(/\D/g, "");
+    const esSerieC = s => /^C\d/.test(s);
+    return MODELOS_MANUALES.find(m => digitos(m) && digitos(m) === digitos(mod) && esSerieC(m) === esSerieC(mod)) || null;
+}
+
+const normalizarNombreParte = s => String(s || "").toLowerCase()
+    .replace(/\((?:page|p|%|[^)]*%[^)]*|dist[^)]*|time[^)]*)\)/g, "")
+    .replace(/[^a-z0-9]/g, "");
+const normalizarUnidad = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const esCuerpoPrincipal = unidad => /accurio|bizhub|press|print|label/i.test(unidad || "");
+
+function codigosFilaManual(f) {
+    const desdeParts = Boolean(f.parts_no);
+    const texto = String(f.parts_no || f.descripcion || "").toUpperCase().replace(/-/g, "");
+    return (texto.match(/[A-Z0-9]{7,12}/g) || [])
+        .filter(c => /\d/.test(c) && (desdeParts || /[A-Z]/.test(c)));
+}
+
+// Condiciones de DIPSW de una fila del manual: "When DIPSW99-6 is 0 and 99-7 is 1" -> [["99","6","0"],["99","7","1"]]
+function condicionesDipsw(observacion) {
+    const condiciones = [];
+    for (const linea of String(observacion || "").split(/\n/)) {
+        const pos = linea.search(/DIPSW/i);
+        if (pos < 0) continue;
+        for (const m of linea.slice(pos).matchAll(/(\d+)-(\d)\s+is\s+([01])/gi)) condiciones.push([String(parseInt(m[1])), m[2], m[3]]);
+    }
+    return condiciones;
+}
+
+function valorDipsw(numero, bit) {
+    const bits = dipswEquipo[numero];
+    return bits ? bits[7 - parseInt(bit)] : "0";
+}
+
+// Una fila cumple si el equipo cumple todas sus líneas de DIPSW; dentro de una línea, alcanza con una alternativa ("..., or when ...").
+function cumpleDipsw(observacion) {
+    return String(observacion || "").split(/\n/).every(linea => {
+        const pos = linea.search(/DIPSW/i);
+        if (pos < 0) return true;
+        return linea.slice(pos).split(/,?\s+or\s+/i).some(alternativa =>
+            [...alternativa.matchAll(/(\d+)-(\d)\s+is\s+([01])/gi)].every(m => valorDipsw(String(parseInt(m[1])), m[2]) === m[3]));
+    });
+}
+
+function indiceVidaManual(modelo) {
+    if (indicesVidaManual[modelo]) return indicesVidaManual[modelo];
+    const porCodigo = new Map(), porNombre = new Map();
+    const agregar = (mapa, clave, fila) => {
+        if (!mapa.has(clave)) mapa.set(clave, []);
+        if (!mapa.get(clave).includes(fila)) mapa.get(clave).push(fila);
+    };
+    for (const f of mantPorModelo[modelo]) {
+        if (!String(f.accion || "").includes("Reemplazo") || !(Number(f.intervalo) > 0)) continue;
+        for (const c of codigosFilaManual(f)) agregar(porCodigo, c, f);
+        agregar(porNombre, normalizarNombreParte(f.descripcion), f);
+    }
+    return (indicesVidaManual[modelo] = { porCodigo, porNombre });
+}
+
+// Elige la fila del manual que corresponde a una parte del List Output.
+function buscarVidaManual(modelo, fila) {
+    const { porCodigo, porNombre } = indiceVidaManual(modelo);
+    const nombre = String(fila["Parts Name"]).trim();
+    const opcion = (nombre.match(/^([A-Z]{2,3}\d{3}[A-Z]?)(?:-\d)?\s/) || [])[1] || null;
+    const nombreSinOpcion = normalizarNombreParte(opcion ? nombre.replace(/^\S+\s+/, "") : nombre);
+
+    let candidatas = [];
+    for (const c of expandirCodigosTxt(fila["Parts No"])) {
+        for (const f of porCodigo.get(c) || []) if (!candidatas.includes(f)) candidatas.push(f);
+    }
+    if (!candidatas.length) candidatas = porNombre.get(nombreSinOpcion) || [];
+    if (!candidatas.length) return null;
+
+    // 1. Cuerpo principal u opción (el List Output antepone la opción: "CU104 ...", "EF106 ...")
+    const enUnidad = candidatas.filter(f => opcion ? normalizarUnidad(f.unidad).includes(opcion) : esCuerpoPrincipal(f.unidad));
+    const porUnidad = enUnidad.length ? enUnidad : candidatas;
+
+    // 2. Nombre de la parte: igual o con más palabras en común
+    let elegidas = porUnidad.filter(f => normalizarNombreParte(f.descripcion) === nombreSinOpcion);
+    if (!elegidas.length) {
+        const palabras = s => new Set(String(s).toLowerCase().split(/[^a-z0-9]+/).filter(p => p.length >= 2));
+        const delTxt = palabras(opcion ? nombre.replace(/^\S+\s+/, "") : nombre);
+        const puntaje = f => [...palabras(f.descripcion)].filter(p => delTxt.has(p)).length;
+        const mejor = Math.max(...porUnidad.map(puntaje));
+        elegidas = porUnidad.filter(f => puntaje(f) === mejor);
+    }
+
+    // 3. DIPSW: la fila cuyas condiciones cumple el equipo (historial del List Output o valor de fábrica)
+    const porNombreElegidas = elegidas;
+    const segunDipsw = elegidas.filter(f => cumpleDipsw(f.observacion));
+    if (segunDipsw.length) elegidas = segunDipsw;
+
+    // Si aún quedan intervalos distintos se toma el menor (el más conservador)
+    const elegida = elegidas.reduce((a, b) => (Number(b.intervalo) < Number(a.intervalo) ? b : a));
+    const alternativas = [];
+    for (const f of porNombreElegidas) {
+        if (Number(f.intervalo) === Number(elegida.intervalo) || alternativas.some(a => a.intervalo === Number(f.intervalo))) continue;
+        const cond = condicionesDipsw(f.observacion).map(([n, b, v]) => `DIPSW${n}-${b}=${v}`).join(", ");
+        alternativas.push({ intervalo: Number(f.intervalo), detalle: cond || f.descripcion });
+    }
+    alternativas.sort((a, b) => a.intervalo - b.intervalo);
+    return { fila: elegida, alternativas };
+}
+
+function aplicarVidasManual(registros, modelo) {
+    for (const fila of registros) {
+        if (fila["Es_Porcentaje_Nativo"]) continue;
+        const hallada = buscarVidaManual(modelo, fila);
+        if (!hallada) continue;
+        const f = hallada.fila;
+        const vida = Number(f.intervalo);
+        if (!fila["Cantidad_Editada"] && Number(f.cantidad) > 0) fila["Cantidad"] = Number(f.cantidad);
+        if (fila["Fuente"] !== "editado") { // si la parte fue editada, se mantiene la edición y el manual queda como control
+            fila["Vida_Util"] = vida;
+            fila["Porcentaje"] = Math.round((fila["Count"] / vida) * 1000) / 10;
+            fila["Fuente"] = "manual";
+        }
+        fila["Manual_Info"] = {
+            modelo, vida,
+            unidad: f.unidad, seccion: f.seccion, descripcion: f.descripcion, parts_no: f.parts_no,
+            // DIPSW de los que depende esta vida útil, con el valor que tiene el equipo
+            dipsw: [...new Set(condicionesDipsw(f.observacion).map(([n, b]) => `${n}-${b}`))].map(clave => {
+                const [n, b] = clave.split("-");
+                return { n, b, v: valorDipsw(n, b), enHistorial: Boolean(dipswEquipo[n]) };
+            }),
+            alternativas: hallada.alternativas
+        };
+        fila["Reemplazo_Sensor"] = /sensor automatically/i.test(f.observacion || "");
+    }
+    return evaluarEstados(registros);
+}
+
+// Se llama al procesar el List Output: si el equipo tiene manual cargado, su vida útil reemplaza a las otras fuentes.
+function vincularVidasManual(modeloTxt) {
+    const modelo = modeloConManual(modeloTxt);
+    if (!modelo) return;
+    if (Array.isArray(mantPorModelo[modelo])) {
+        aplicarVidasManual(dfResultado, modelo);
+        return;
+    }
+    const registros = dfResultado;
+    cargarMantenimiento(modelo).then(() => {
+        if (registros !== dfResultado || !Array.isArray(mantPorModelo[modelo])) return; // se cargó otro TXT o no hubo conexión
+        aplicarVidasManual(dfResultado, modelo);
+        actualizarVista();
+    });
+}
+
+function textoFuente(fila) {
+    return fila["Fuente"] ? t(`fuente_${fila["Fuente"]}`) : "-";
+}
+
+// Detalle de la vida útil (tooltip): coincidencia con otras fuentes, DIPSW y alternativas.
+function detalleVida(fila) {
+    const fmt = n => Number(n).toLocaleString("es-AR");
+    const info = fila["Manual_Info"];
+    const lineas = [];
+    if (fila["Fuente"] === "editado") lineas.push(`${t("fuente_editado")}: ${fmt(fila["Vida_Util"])}`);
+    if (!info) return lineas.join("\n");
+    lineas.push(`${t("fuente_manual")} ${info.modelo}: ${info.descripcion} (${info.unidad}) → ${fmt(info.vida)}`);
+    if (fila["Fuente"] === "editado") {
+        lineas.push(info.vida === fila["Vida_Util"]
+            ? t("vida_coincide").replace("{fuente}", t("fuente_manual"))
+            : `⚠️ ${t("fuente_editado")}: ${fmt(fila["Vida_Util"])} · ${t("fuente_manual")}: ${fmt(info.vida)}`);
+    }
+    for (const d of info.dipsw) {
+        lineas.push(t(d.enHistorial ? "vida_dipsw_historial" : "vida_dipsw_fabrica").replace("{sw}", `DIPSW${d.n}-${d.b}`).replace("{v}", d.v));
+    }
+    if (info.alternativas.length) {
+        lineas.push(t("vida_alternativas") + " " + info.alternativas.map(a => `${fmt(a.intervalo)} (${a.detalle})`).join(" · "));
+    }
+    if (fila["Reemplazo_Sensor"]) lineas.push(t("vida_sensor"));
+    lineas.push(t("vida_ver_manual"));
+    return lineas.join("\n");
+}
+
+function verParteEnManual(fila) {
+    const info = fila["Manual_Info"];
+    if (!info) return;
+    document.getElementById("combo-modelo-mant").value = info.modelo;
+    document.getElementById("combo-unidad-mant").value = "";
+    document.getElementById("combo-accion-mant").value = "";
+    document.getElementById("entrada-mant").value = info.parts_no ? info.parts_no.split(/[\s\/,]+/)[0] : info.descripcion;
+    mostrarPestana("mant");
+    llenarFiltrosMantenimiento();
+    renderizarMantenimiento();
 }
 
 function llenarFiltrosMantenimiento() {
@@ -2673,7 +2337,7 @@ function renderizarMantenimiento() {
     const visibles = filas.filter(f => {
         if (unidad && f.unidad !== unidad) return false;
         if (accion && !(f.accion || "").split(", ").includes(accion)) return false;
-        const texto = [f.descripcion, f.parts_no, f.seccion, f.observacion, f.unidad].join(" ").toLowerCase();
+        const texto = [f.descripcion, f.parts_no, f.seccion, f.observacion, f.unidad, ...codigosArballonDe(f.parts_no)].join(" ").toLowerCase();
         return palabras.every(p => texto.includes(p));
     });
 
@@ -2688,7 +2352,7 @@ function renderizarMantenimiento() {
             <td class="ajustar">${escaparHtml(f.unidad || "")}</td>
             <td class="ajustar">${escaparHtml(f.seccion || "")}</td>
             <td class="ajustar" style="font-weight:600;">${resaltarPalabras(f.descripcion || "", palabras)}</td>
-            <td>${resaltarPalabras(f.parts_no || "", palabras)}${referenciaCatalogo(modelo, f.parts_no || partesEnTexto(f.descripcion))}</td>
+            <td>${resaltarPalabras(f.parts_no || "", palabras)}${referenciaArballon(f.parts_no, palabras)}${referenciaCatalogo(modelo, f.parts_no || partesEnTexto(f.descripcion))}</td>
             <td class="num">${f.cantidad ?? ""}</td>
             <td class="num" style="white-space:nowrap;">${escaparHtml(formatearIntervalo(f))}${puntual}</td>
             <td>${acciones}</td>
@@ -2704,6 +2368,12 @@ const COLUMNAS_REP = [
     ["Page", "rep_col_pagina", "num"], ["Key", "rep_col_key", "num"], ["Parts No.", "rep_col_parts", ""],
     ["Parts Name", "rep_col_nombre", "ajustar"], ["Class", "rep_col_clase", ""], ["Quantity", "rep_col_cant", "num"],
     ["Ship Unit", "rep_col_envio", "num"], ["Destinations", "rep_col_destinos", "ajustar"], ["PMN No.", "rep_col_pmn", ""]
+];
+// Opción del combo de Repuestos que muestra la tabla Arballon de todos los equipos (Arballon <-> Parts No)
+const REP_ARBALLON = "ARBALLON";
+const COLUMNAS_ARB = [
+    ["Codigo Arballon", "rep_col_arballon", "num"], ["Parts No", "rep_col_parts", ""],
+    ["Parts Name", "rep_col_nombre", "ajustar"], ["Cat", "rep_col_clase", ""], ["Equipos", "rep_col_equipos", "ajustar"]
 ];
 const repuestosPorModelo = {}; // modelo -> filas | "cargando" | "error"
 const referenciasCatalogo = {}; // "modelo|parts_no" -> filas del catálogo que coinciden
@@ -2742,16 +2412,18 @@ function llenarFiltrosRepuestos() {
     const comboModelo = document.getElementById("combo-modelo-rep");
     const actual = comboModelo.value;
     comboModelo.innerHTML = "";
-    Object.keys(CATALOGOS_REPUESTOS).forEach(m => {
+    [[REP_ARBALLON, t("rep_arballon")], ...Object.keys(CATALOGOS_REPUESTOS).map(m => [m, m])].forEach(([valor, texto]) => {
         const op = document.createElement("option");
-        op.value = m;
-        op.textContent = m;
+        op.value = valor;
+        op.textContent = texto;
         comboModelo.appendChild(op);
     });
     if (actual in CATALOGOS_REPUESTOS) comboModelo.value = actual;
 
-    const filas = repuestosPorModelo[comboModelo.value];
-    const clases = Array.isArray(filas) ? [...new Set(filas.map(f => f.Class).filter(Boolean))].sort() : [];
+    const esArballon = comboModelo.value === REP_ARBALLON;
+    const filas = esArballon ? dfReferencia : repuestosPorModelo[comboModelo.value];
+    const colClase = esArballon ? "Cat" : "Class";
+    const clases = Array.isArray(filas) ? [...new Set(filas.map(f => f[colClase]).filter(Boolean))].sort() : [];
     const comboClase = document.getElementById("combo-clase-rep");
     const claseActual = comboClase.value;
     comboClase.innerHTML = "";
@@ -2765,8 +2437,10 @@ function llenarFiltrosRepuestos() {
 }
 
 function renderizarRepuestos() {
+    if (document.getElementById("combo-modelo-rep").value === REP_ARBALLON) return renderizarArballon();
     document.getElementById("tabla-rep-headers").innerHTML =
-        COLUMNAS_REP.map(([, clave]) => `<th class="align-l">${escaparHtml(t(clave))}</th>`).join("");
+        COLUMNAS_REP.map(([, clave]) => `<th class="align-l">${escaparHtml(t(clave))}</th>`).join("") +
+        `<th class="align-l">${escaparHtml(t("rep_col_arballon"))}</th>`;
     const cuerpo = document.getElementById("tabla-rep-body");
     const aviso = document.getElementById("aviso-rep");
     const lblTotal = document.getElementById("lbl-rep-total");
@@ -2783,7 +2457,7 @@ function renderizarRepuestos() {
     const palabras = document.getElementById("entrada-rep").value.toLowerCase().split(/\s+/).filter(Boolean);
     const visibles = filas.filter(f => {
         if (clase && f.Class !== clase) return false;
-        const texto = [f["Parts No."], f["Parts Name"], f["PMN No."], f.Destinations, `p${f.Page}`].join(" ").toLowerCase();
+        const texto = [f["Parts No."], f["Parts Name"], f["PMN No."], f.Destinations, `p${f.Page}`, ...codigosArballonDe(f["Parts No."])].join(" ").toLowerCase();
         return palabras.every(p => texto.includes(p));
     });
 
@@ -2793,8 +2467,50 @@ function renderizarRepuestos() {
     aviso.textContent = visibles.length ? "" : t("rep_sin_filas");
     cuerpo.innerHTML = visibles.slice(0, LIMITE_FILAS_REPUESTOS).map((f, i) =>
         `<tr class="${i % 2 ? "impar" : "par"}">${COLUMNAS_REP.map(([col, , css]) =>
+            `<td class="${css}">${resaltarPalabras(f[col] ?? "", palabras)}</td>`).join("")}` +
+        `<td class="num">${resaltarPalabras(codigosArballonDe(f["Parts No."]).join(" / "), palabras)}</td></tr>`
+    ).join("");
+}
+
+// Tabla Arballon completa: se busca por código Arballon, Parts No (con o sin guiones), nombre o equipo.
+function renderizarArballon() {
+    document.getElementById("tabla-rep-headers").innerHTML =
+        COLUMNAS_ARB.map(([, clave]) => `<th class="align-l">${escaparHtml(t(clave))}</th>`).join("");
+    const cuerpo = document.getElementById("tabla-rep-body");
+    const aviso = document.getElementById("aviso-rep");
+    const lblTotal = document.getElementById("lbl-rep-total");
+
+    if (!dfReferencia.length) {
+        cuerpo.innerHTML = "";
+        lblTotal.textContent = "";
+        aviso.textContent = t("rep_arballon_vacio");
+        return;
+    }
+
+    const clase = document.getElementById("combo-clase-rep").value;
+    const palabras = document.getElementById("entrada-rep").value.toLowerCase().split(/\s+/).filter(Boolean);
+    const sinGuiones = p => p.replace(/[-\s]/g, "");
+    const visibles = dfReferencia.filter(f => {
+        if (clase && f.Cat !== clase) return false;
+        const texto = COLUMNAS_ARB.map(([col]) => f[col] ?? "").join(" ").toLowerCase();
+        const partes = sinGuiones(String(f["Parts No"] ?? "").toLowerCase());
+        return palabras.every(p => texto.includes(p) || partes.includes(sinGuiones(p)));
+    });
+
+    lblTotal.textContent = visibles.length > LIMITE_FILAS_REPUESTOS
+        ? t("rep_total_parcial").replace("{n}", LIMITE_FILAS_REPUESTOS).replace("{total}", visibles.length)
+        : t("rep_total").replace("{n}", visibles.length);
+    aviso.textContent = visibles.length ? "" : t("rep_sin_filas");
+    cuerpo.innerHTML = visibles.slice(0, LIMITE_FILAS_REPUESTOS).map((f, i) =>
+        `<tr class="${i % 2 ? "impar" : "par"}">${COLUMNAS_ARB.map(([col, , css]) =>
             `<td class="${css}">${resaltarPalabras(f[col] ?? "", palabras)}</td>`).join("")}</tr>`
     ).join("");
+}
+
+function referenciaArballon(partsNo, palabras) {
+    const codigos = codigosArballonDe(partsNo);
+    if (!codigos.length) return "";
+    return `<div style="font-size:11px; color:var(--texto-gris);">${escaparHtml(t("rep_col_arballon"))}: ${resaltarPalabras(codigos.join(" / "), palabras)}</div>`;
 }
 
 // Busca en el catálogo del equipo los repuestos de un Parts No. del manual ("AC0CR744##/AC0CR783##" -> AC0CR744xx)
@@ -2959,6 +2675,9 @@ async function cargarArballonSupabase() {
     }
     if (contenidoTxtActual) parsearSpecialPartsPuro(contenidoTxtActual);
     actualizarVista();
+    llenarFiltrosRepuestos();
+    renderizarRepuestos();
+    renderizarMantenimiento();
     ocultarProgreso();
 }
 

@@ -1,10 +1,10 @@
 // Service Worker de Konica Minolta Technical Station
 // - La app (index.html) se busca primero en la red para recibir siempre la última versión de Netlify;
 //   si no hay conexión, se usa la copia guardada.
-// - Las librerías de los CDN (SheetJS y PDF.js) tienen versión fija, así que se sirven desde la caché.
+// - La librería del CDN (SheetJS) tiene versión fija, así que se sirven desde la caché.
 // Cambiar VERSION cuando se agreguen archivos nuevos a la lista de precarga.
 
-const VERSION = "km-station-v2";
+const VERSION = "km-station-v3";
 
 // Solo estos dominios se guardan en caché; el resto (por ejemplo Supabase) va siempre directo a la red
 const CDN_CACHEABLES = ["cdn.jsdelivr.net", "cdnjs.cloudflare.com"];
@@ -18,9 +18,7 @@ const PRECARGA = [
     "./icons/icon-maskable-192.png",
     "./icons/icon-maskable-512.png",
     "./icons/apple-touch-icon.png",
-    "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
-    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+    "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
 ];
 
 self.addEventListener("install", (event) => {
