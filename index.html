@@ -918,6 +918,10 @@ const TRADUCCIONES = {
         "col_partno": "Parts No",
         "col_count": "Count (A4)",
         "col_vida": "Vida Útil",
+        "col_count_m": "Count (m)",
+        "col_vida_m": "Vida Útil (m)",
+        "pct_maquina_corto": "(impresora)",
+        "pct_detalle": "Calculado con la vida útil: {calc} · Informado por la impresora: {maq}. Se toma el mayor (el manual indica reemplazar en lo que llegue primero).",
         "col_fuente": "Fuente",
         "fuente_manual": "Manual",
         "fuente_editado": "Editado",
@@ -1049,6 +1053,10 @@ const TRADUCCIONES = {
         "col_partno": "Parts No",
         "col_count": "Count (A4)",
         "col_vida": "Yield",
+        "col_count_m": "Count (m)",
+        "col_vida_m": "Yield (m)",
+        "pct_maquina_corto": "(machine)",
+        "pct_detalle": "Calculated from the yield: {calc} · Reported by the machine: {maq}. The higher one is used (the manual says to replace at whichever comes first).",
         "col_fuente": "Source",
         "fuente_manual": "Manual",
         "fuente_editado": "Edited",
@@ -1267,7 +1275,10 @@ function parsearSpecialPartsPuro(contenido) {
     if (machineMatch) {
         const rawName = machineMatch[1].trim();
         const modelCodeMatch = rawName.match(/(C\d+[A-Z0-9]*)/i);
-        if (modelCodeMatch) {
+        const labelMatch = rawName.match(/(?:accurio\s*label|^AL)[\s-]*(\d{3,4})/i);
+        if (labelMatch) {
+            modeloDetectado = `AL${labelMatch[1]}`; // AccurioLabel 400 -> AL400
+        } else if (modelCodeMatch) {
             modeloDetectado = modelCodeMatch[1].toUpperCase();
         } else {
             modeloDetectado = rawName.replace(/(bizhub|press|accuriopress|accurioprint|\s+)/gi, "").toUpperCase();
@@ -1335,6 +1346,15 @@ function parsearSpecialPartsPuro(contenido) {
         }
     }
 
+    // Cada contador queda vinculado a la línea "%" de la misma pieza: la impresora calcula su propio
+    // porcentaje de vida (LIFE VALUE) y el manual indica reemplazar en lo que llegue primero.
+    const pctMaquina = new Map();
+    const clavePieza = r => `${r["Parts No"]}|${normalizarNombreParte(r["Parts Name"])}`;
+    for (const r of registros) if (r["Es_Porcentaje_Nativo"]) pctMaquina.set(clavePieza(r), r["Count"]);
+    for (const r of registros) {
+        if (!r["Es_Porcentaje_Nativo"] && pctMaquina.has(clavePieza(r))) r["Pct_Maquina"] = pctMaquina.get(clavePieza(r));
+    }
+
     dipswEquipo = parsearHistorialDipsw(contenido);
     dfResultado = cruzarArballonYVidaUtil(registros, modeloUsar);
     vincularVidasManual(modeloUsar);
@@ -1396,9 +1416,18 @@ function cruzarArballonYVidaUtil(registros, modeloActual) {
     return evaluarEstados(registros);
 }
 
+// El estado se evalúa con el mayor entre el % calculado (contador / vida útil) y el % que informa la impresora.
+function porcentajeAlerta(fila) {
+    const calc = fila["Porcentaje"];
+    const maquina = fila["Es_Porcentaje_Nativo"] ? null : fila["Pct_Maquina"];
+    if (maquina === null || maquina === undefined) return calc;
+    return calc === null || calc === undefined || maquina > calc ? maquina : calc;
+}
+
 function evaluarEstados(registros) {
     for (const fila of registros) {
-        const pct = fila["Porcentaje"];
+        const pct = porcentajeAlerta(fila);
+        fila["Porcentaje_Alerta"] = pct;
         if (fila["Reemplazo_Sensor"]) {
             fila["Estado"] = "ⓘ SENSOR";
         } else if (pct !== null && pct !== undefined && !isNaN(pct)) {
@@ -1480,9 +1509,18 @@ function actualizarTextosIdioma() {
     actualizarVista();
 }
 
+// Los equipos AccurioLabel (AL...) cuentan los consumibles en metros, no en páginas.
+function esEquipoEnMetros(modelo) {
+    return /^AL\d/i.test(String(modelo || ""));
+}
+
 function actualizarVista() {
     const tbody = document.getElementById("tabla-body");
     tbody.innerHTML = "";
+    const enMetros = esEquipoEnMetros(modeloActivoActual);
+    const headers = document.querySelectorAll("#tabla-headers th");
+    headers[5].textContent = t(enMetros ? "col_count_m" : "col_count");
+    headers[6].textContent = t(enMetros ? "col_vida_m" : "col_vida");
 
     if (!dfResultado.length) {
         document.getElementById("lbl-info").textContent = t("info_pendiente");
@@ -1505,8 +1543,8 @@ function actualizarVista() {
     }
 
     if (document.getElementById("filtro-alertas").checked) {
-        mostrar = mostrar.filter(f => f.Porcentaje !== null && f.Porcentaje >= 90 && !f.Reemplazo_Sensor);
-        mostrar.sort((a, b) => (b.Porcentaje || 0) - (a.Porcentaje || 0));
+        mostrar = mostrar.filter(f => f.Porcentaje_Alerta !== null && f.Porcentaje_Alerta >= 90 && !f.Reemplazo_Sensor);
+        mostrar.sort((a, b) => (b.Porcentaje_Alerta || 0) - (a.Porcentaje_Alerta || 0));
     }
 
     const busq = document.getElementById("entrada-buscar").value.trim().toLowerCase();
@@ -1543,7 +1581,11 @@ function actualizarVista() {
             countStr = fila.Count.toLocaleString("es-AR");
             vidaStr = fila.Vida_Util ? parseInt(fila.Vida_Util).toLocaleString("es-AR") : "-";
             pctStr = fila.Porcentaje !== null ? `${fila.Porcentaje}%` : "-";
+            if (fila.Porcentaje_Alerta !== fila.Porcentaje) pctStr = `${fila.Porcentaje_Alerta}% ${t("pct_maquina_corto")}`;
         }
+        const detallePct = fila.Pct_Maquina !== undefined && !fila.Es_Porcentaje_Nativo
+            ? t("pct_detalle").replace("{calc}", fila.Porcentaje !== null ? `${fila.Porcentaje}%` : "-").replace("{maq}", `${fila.Pct_Maquina}%`)
+            : "";
 
         const estadoMostrar = esIngles
             ? fila.Estado.replace("EXCEDIDO", "EXCEEDED").replace("PRÓXIMO", "UPCOMING")
@@ -1563,7 +1605,7 @@ function actualizarVista() {
             { txt: countStr, cls: "align-r" },
             { txt: vidaStr, cls: "align-r", title: detalle },
             { txt: fuenteStr, cls: "align-c", title: detalle, manual: Boolean(fila["Manual_Info"]) },
-            { txt: pctStr, cls: "align-r" },
+            { txt: pctStr, cls: "align-r", title: detallePct },
             { txt: fila["ResetCount"], cls: "align-c" },
             { txt: estadoMostrar, cls: "align-c", title: fila["Reemplazo_Sensor"] ? t("vida_sensor") : "" }
         ];
@@ -1661,8 +1703,8 @@ function exportarExcel() {
     const esIngles = idiomaActual === "en";
 
     const alertas = dfResultado
-        .filter(r => r.Porcentaje !== null && r.Porcentaje >= 90 && !r.Reemplazo_Sensor)
-        .sort((a, b) => (b.Porcentaje || 0) - (a.Porcentaje || 0));
+        .filter(r => r.Porcentaje_Alerta !== null && r.Porcentaje_Alerta >= 90 && !r.Reemplazo_Sensor)
+        .sort((a, b) => (b.Porcentaje_Alerta || 0) - (a.Porcentaje_Alerta || 0));
 
     // 1. Resumen Pedido (7 columnas exactas)
     const datosResumen = alertas.map(r => ({
@@ -1672,7 +1714,7 @@ function exportarExcel() {
         "Nombre de la Parte": r["Parts Name"],
         "No. de Parte": r["Parts No"],
         "Contador": r["Count"],
-        "Porcentaje": r["Porcentaje"] !== null ? `${r["Porcentaje"].toFixed(1)}%` : "-"
+        "Porcentaje": r["Porcentaje_Alerta"] !== null ? `${Number(r["Porcentaje_Alerta"]).toFixed(1)}%` : "-"
     }));
 
     const formatearCompleta = (lista) => lista.map(r => ({
@@ -1684,9 +1726,12 @@ function exportarExcel() {
         "Es_Porcentaje_Nativo": r["Es_Porcentaje_Nativo"],
         "Count": r["Count"],
         "Vida_Util": r["Vida_Util"] || "",
+        "Unidad": esEquipoEnMetros(modeloActivoActual) ? "m" : (esIngles ? "pages" : "páginas"),
         "Fuente": r["Fuente"] ? t(`fuente_${r["Fuente"]}`) : "",
         "Vida_Manual": r["Manual_Info"] ? r["Manual_Info"].vida : "",
-        "Porcentaje": r["Porcentaje"] !== null ? `${r["Porcentaje"].toFixed(1)}%` : "-",
+        "Porcentaje": r["Porcentaje_Alerta"] !== null ? `${Number(r["Porcentaje_Alerta"]).toFixed(1)}%` : "-",
+        "Porcentaje_Calculado": r["Es_Porcentaje_Nativo"] || r["Porcentaje"] === null ? "" : `${r["Porcentaje"].toFixed(1)}%`,
+        "Porcentaje_Impresora": r["Pct_Maquina"] !== undefined && !r["Es_Porcentaje_Nativo"] ? `${r["Pct_Maquina"]}%` : "",
         "PrevCount": r["PrevCount"],
         "ResetCount": r["ResetCount"],
         "Estado": esIngles ? r["Estado"].replace("EXCEDIDO", "EXCEEDED").replace("PRÓXIMO", "UPCOMING") : r["Estado"]
@@ -2117,7 +2162,7 @@ function modeloConManual(modelo) {
 }
 
 const normalizarNombreParte = s => String(s || "").toLowerCase()
-    .replace(/\((?:page|p|%|[^)]*%[^)]*|dist[^)]*|time[^)]*)\)/g, "")
+    .replace(/\((?:page|p|m|%|[^)]*%[^)]*|dist[^)]*|time[^)]*)\)/g, "")
     .replace(/[^a-z0-9]/g, "");
 const normalizarUnidad = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const esCuerpoPrincipal = unidad => /accurio|bizhub|press|print|label/i.test(unidad || "");
@@ -2232,6 +2277,7 @@ function aplicarVidasManual(registros, modelo) {
             modelo, vida,
             unidad: f.unidad, seccion: f.seccion, descripcion: f.descripcion, parts_no: f.parts_no,
             // DIPSW de los que depende esta vida útil, con el valor que tiene el equipo
+            unidadIntervalo: f.intervalo_unidad,
             dipsw: [...new Set(condicionesDipsw(f.observacion).map(([n, b]) => `${n}-${b}`))].map(clave => {
                 const [n, b] = clave.split("-");
                 return { n, b, v: valorDipsw(n, b), enHistorial: Boolean(dipswEquipo[n]) };
@@ -2270,7 +2316,7 @@ function detalleVida(fila) {
     const lineas = [];
     if (fila["Fuente"] === "editado") lineas.push(`${t("fuente_editado")}: ${fmt(fila["Vida_Util"])}`);
     if (!info) return lineas.join("\n");
-    lineas.push(`${t("fuente_manual")} ${info.modelo}: ${info.descripcion} (${info.unidad}) → ${fmt(info.vida)}`);
+    lineas.push(`${t("fuente_manual")} ${info.modelo}: ${info.descripcion} (${info.unidad}) → ${fmt(info.vida)}${info.unidadIntervalo === "m" ? " m" : ""}`);
     if (fila["Fuente"] === "editado") {
         lineas.push(info.vida === fila["Vida_Util"]
             ? t("vida_coincide").replace("{fuente}", t("fuente_manual"))
