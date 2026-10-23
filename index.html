@@ -848,7 +848,7 @@ if (window.pdfjsLib) {
 const MODELOS_INICIALES = [
     "C14000", "C14010", "C7100", "C6100", "C6080", "C5080", "C5065",
     "C4080", "C4065", "C3080", "C3070L", "C3065L",
-    "C2080", "C2060", "C1070", "C1060", "PRO1100", "AP2100"
+    "C2080", "C2060", "C1070", "C1060", "PRO1100", "AP2100", "6136"
 ];
 
 const PREFIJOS_SERIE = {
@@ -2445,7 +2445,7 @@ document.querySelectorAll("#tabla-headers th").forEach(th => {
 // Si no hay conexión, se sigue usando la última copia guardada en el navegador.
 // ================= CÓDIGOS DE ERROR (MANUALES DE SERVICIO EN SUPABASE) =================
 const SUPABASE_TABLA_CODIGOS = "manual_codigos_error";
-const MODELOS_MANUALES = ["C14000", "AL400", "PRO1100", "AP2100"]; // equipos con manual cargado en Supabase
+const MODELOS_MANUALES = ["C14000", "AL400", "PRO1100", "AP2100", "6136"]; // equipos con manual cargado en Supabase
 const LIMITE_CODIGOS = 60;
 const CAMPOS_BUSQUEDA_CODIGOS = ["codigo", "clasificacion", "causa", "partes_sospechosas", "solucion"];
 const CAMPOS_TARJETA_CODIGO = [
