@@ -1960,7 +1960,7 @@ document.querySelectorAll("#tabla-headers th").forEach(th => {
 // Si no hay conexión, se sigue usando la última copia guardada en el navegador.
 // ================= CÓDIGOS DE ERROR (MANUALES DE SERVICIO EN SUPABASE) =================
 const SUPABASE_TABLA_CODIGOS = "manual_codigos_error";
-const MODELOS_MANUALES = ["C14000", "AL400", "PRO1100", "AP2100", "6136", "7136", "C7100"]; // equipos con manual cargado en Supabase
+const MODELOS_MANUALES = ["C14000", "AL400", "PRO1100", "AP2100", "6136", "7136", "C7100", "950i", "4752", "C759", "306i", "360i", "650i"]; // equipos con manual cargado en Supabase
 const LIMITE_CODIGOS = 60;
 const CAMPOS_BUSQUEDA_CODIGOS = ["codigo", "clasificacion", "causa", "partes_sospechosas", "solucion"];
 const CAMPOS_TARJETA_CODIGO = [
@@ -2152,10 +2152,19 @@ async function descargarMantenimiento(modelo) {
 const indicesVidaManual = {}; // modelo -> { porCodigo: Map, porNombre: Map }
 
 // Equipo del List Output -> equipo con manual cargado (p. ej. "2100" -> "AP2100", "PRO1100" -> "PRO1100")
+// Equipos que comparten el manual de otro modelo
+const MANUAL_COMPARTIDO = {
+    "850I": "950i", "4052": "4752", "C659": "C759",
+    "266I": "306i", "246I": "306i", "226I": "306i",
+    "300I": "360i", "361I": "360i", "301I": "360i",
+    "550I": "650i", "450I": "650i", "451I": "650i"
+};
+
 function modeloConManual(modelo) {
     if (!modelo) return null;
     const mod = String(modelo).toUpperCase();
     if (MODELOS_MANUALES.includes(mod)) return mod;
+    if (MANUAL_COMPARTIDO[mod]) return MANUAL_COMPARTIDO[mod];
     const digitos = s => s.replace(/\D/g, "");
     const esSerieC = s => /^C\d/.test(s);
     return MODELOS_MANUALES.find(m => digitos(m) && digitos(m) === digitos(mod) && esSerieC(m) === esSerieC(mod)) || null;
